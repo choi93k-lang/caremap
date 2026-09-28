@@ -89,10 +89,6 @@ def add_choropleth_layer(care_map, geojson_data, df_pop, selected_district="전�
             props["elderly_pop"] = info["elderly"]
             filtered_features.append(feature)
 
-    # 방어 코드: 필터링된 폴리곤이 없을 경우 에러 없이 안전하게 건너뛰기
-    if not filtered_features:
-        return
-
     display_geojson = {
         "type": "FeatureCollection",
         "features": filtered_features
