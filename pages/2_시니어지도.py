@@ -21,12 +21,21 @@ DISTRICT_CENTERS = {
 }
 
 
+@st.cache_data
 def load_geojson_data():
-    """울산 행정동 GeoJSON 데이터를 로드합니다."""
+    """울산 행정동 GeoJSON 데이터를 메모리에 캐싱하여 로드합니다."""
     if os.path.exists(GEOJSON_PATH):
         with open(GEOJSON_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
     return None
+
+
+@st.cache_data
+def get_cached_map_data(district_name):
+    """구·군별 인구 및 시설 데이터를 캐싱하여 로드합니다."""
+    df_pop = get_population_summary(district_name)
+    df_fac = get_facilities(district_name, "all")
+    return df_pop, df_fac
 
 
 def get_color_by_rate(rate):
@@ -48,7 +57,7 @@ def create_base_map(center_lat, center_lon, zoom_level):
     care_map = folium.Map(
         location=[center_lat, center_lon],
         zoom_start=zoom_level,
-        tiles="CartoDB positron"
+        tiles="OpenStreetMap"
     )
     return care_map
 
@@ -101,7 +110,7 @@ def add_choropleth_layer(care_map, geojson_data, df_pop):
 
 
 def add_facility_markers(care_map, df_fac, show_hospitals, show_centers):
-    """병·의원 및 경로당 마커를 지도에 추가합니다."""
+    """병·의원 및 경로당 마커를 가벼운 툴팁과 팝업으로 지도에 추가합니다."""
     # 유효한 좌표만 필터링
     valid_fac = df_fac[df_fac["is_coord_valid"] == 1].dropna(subset=["latitude", "longitude"])
 
@@ -110,22 +119,17 @@ def add_facility_markers(care_map, df_fac, show_hospitals, show_centers):
         hospital_group = folium.FeatureGroup(name="🏥 병·의원 레이어")
         hospitals = valid_fac[valid_fac["facility_type"] == "hospital"]
         for _, row in hospitals.iterrows():
-            popup_html = f"""
-            <div style="font-family: sans-serif; font-size: 13px; width: 220px;">
-                <b style="color: #2b579a;">🏥 {row['facility_name']}</b><br>
-                <b>구분:</b> 의료기관<br>
-                <b>주소:</b> {row['road_address']}<br>
-                <b>연락처:</b> {row['tel_number'] or '정보없음'}
-            </div>
-            """
+            tel = row['tel_number'] if row['tel_number'] else '정보없음'
+            popup_text = f"<b>🏥 {row['facility_name']}</b><br>주소: {row['road_address']}<br>전화: {tel}"
             folium.CircleMarker(
                 location=[row["latitude"], row["longitude"]],
-                radius=6,
+                radius=5,
                 color="#1F77B4",
                 fill=True,
                 fill_color="#1F77B4",
-                fill_opacity=0.8,
-                popup=folium.Popup(popup_html, max_width=250)
+                fill_opacity=0.85,
+                tooltip=f"🏥 {row['facility_name']}",
+                popup=folium.Popup(popup_text, max_width=240)
             ).add_to(hospital_group)
         hospital_group.add_to(care_map)
 
@@ -134,22 +138,17 @@ def add_facility_markers(care_map, df_fac, show_hospitals, show_centers):
         center_cluster = MarkerCluster(name="👵 경로당 레이어 (클러스터)")
         centers = valid_fac[valid_fac["facility_type"] == "senior_center"]
         for _, row in centers.iterrows():
-            popup_html = f"""
-            <div style="font-family: sans-serif; font-size: 13px; width: 220px;">
-                <b style="color: #27ae60;">👵 {row['facility_name']}</b><br>
-                <b>구분:</b> 여가복지시설(경로당)<br>
-                <b>주소:</b> {row['road_address']}<br>
-                <b>연락처:</b> {row['tel_number'] or '정보없음'}
-            </div>
-            """
+            tel = row['tel_number'] if row['tel_number'] else '정보없음'
+            popup_text = f"<b>👵 {row['facility_name']}</b><br>주소: {row['road_address']}<br>전화: {tel}"
             folium.CircleMarker(
                 location=[row["latitude"], row["longitude"]],
-                radius=5,
+                radius=4,
                 color="#2ECC71",
                 fill=True,
                 fill_color="#2ECC71",
-                fill_opacity=0.8,
-                popup=folium.Popup(popup_html, max_width=250)
+                fill_opacity=0.85,
+                tooltip=f"👵 {row['facility_name']}",
+                popup=folium.Popup(popup_text, max_width=240)
             ).add_to(center_cluster)
         center_cluster.add_to(care_map)
 
@@ -169,9 +168,8 @@ def main():
     show_centers = st.sidebar.checkbox("👵 경로당 마커 표시", value=True)
     show_choropleth = st.sidebar.checkbox("🎨 행정동 고령화율 단계구분도 표시", value=True)
 
-    # 데이터 로드
-    df_pop = get_population_summary(selected_district)
-    df_fac = get_facilities(selected_district, "all")
+    # 캐싱된 데이터 로드
+    df_pop, df_fac = get_cached_map_data(selected_district)
     geojson_data = load_geojson_data()
 
     # 지도 중심점 계산
@@ -197,9 +195,10 @@ def main():
     with col3:
         st.warning("💡 범례: 고령화율 25%+ (진한빨강) ~ 14%미만 (연노랑)")
 
-    # Streamlit에 Folium 지도 렌더링
-    st_folium(care_map, width="100%", height=600)
+    # Streamlit에 Folium 지도 렌더링 (returned_objects=[] 로 단방향 경량 모드 활성화)
+    st_folium(care_map, width="100%", height=600, returned_objects=[])
 
 
 if __name__ == "__main__":
     main()
+

@@ -195,3 +195,4 @@ def get_region_comparison_data():
         axis=1
     )
     return df
+
