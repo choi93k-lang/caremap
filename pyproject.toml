@@ -3,6 +3,7 @@ name = "ulsan-senior-caremap"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
+    "beautifulsoup4>=4.15.0",
     "folium>=0.20.0",
     "pandas>=3.0.6",
     "plotly>=7.1.0",

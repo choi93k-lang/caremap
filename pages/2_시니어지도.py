@@ -37,17 +37,17 @@ def get_cached_map_data(district_name):
 
 
 def get_color_by_rate(rate):
-    """고령화율 값에 따라 연속형 단계 색상을 반환합니다."""
-    if rate >= 25.0:
-        return "#BD0026"
+    """실제 울산 통계 기준(12%~55%)에 맞춘 고령화율 단계 색상을 반환합니다."""
+    if rate >= 30.0:
+        return "#990000"  # 30% 이상: 초고령 심화 지역
+    elif rate >= 25.0:
+        return "#D7301F"  # 25% ~ 30%
     elif rate >= 20.0:
-        return "#F03B20"
-    elif rate >= 17.0:
-        return "#FD8D3C"
-    elif rate >= 14.0:
-        return "#FECC5C"
+        return "#FC8D59"  # 20% ~ 25%: 초고령사회 진입 기준
+    elif rate >= 16.0:
+        return "#FDBB84"  # 16% ~ 20%
     else:
-        return "#FFFFB2"
+        return "#FEF0D9"  # 16% 미만: 상대적 젊은 신도심
 
 
 def create_base_map(center_lat, center_lon, zoom_level):
@@ -60,8 +60,8 @@ def create_base_map(center_lat, center_lon, zoom_level):
     return care_map
 
 
-def add_choropleth_layer(care_map, geojson_data, df_pop):
-    """행정동별 고령화율 단계구분도 레이어를 추가합니다."""
+def add_choropleth_layer(care_map, geojson_data, df_pop, selected_district="전체"):
+    """선택된 구·군에 맞춰 행정동별 고령화율 단계구분도 레이어를 추가합니다."""
     if not geojson_data:
         return
 
@@ -76,14 +76,23 @@ def add_choropleth_layer(care_map, geojson_data, df_pop):
             "elderly": row["elderly_population"]
         }
 
-    # GeoJSON 각 폴리곤 속성에 인구 데이터 주입
+    # 선택된 구·군에 해당하는 폴리곤만 필터링
+    filtered_features = []
     for feature in geojson_data["features"]:
         props = feature["properties"]
-        code = str(props.get("adm_cd2", ""))
-        info = pop_lookup.get(code, {"dong": props.get("dong_name", "미상"), "rate": 0, "total": 0, "elderly": 0})
-        props["aging_rate"] = info["rate"]
-        props["total_pop"] = info["total"]
-        props["elderly_pop"] = info["elderly"]
+        f_district = props.get("district_name") or props.get("sggnm")
+        if selected_district == "전체" or f_district == selected_district:
+            code = str(props.get("adm_cd2", ""))
+            info = pop_lookup.get(code, {"dong": props.get("dong_name", "미상"), "rate": 0, "total": 0, "elderly": 0})
+            props["aging_rate"] = info["rate"]
+            props["total_pop"] = info["total"]
+            props["elderly_pop"] = info["elderly"]
+            filtered_features.append(feature)
+
+    display_geojson = {
+        "type": "FeatureCollection",
+        "features": filtered_features
+    }
 
     def style_function(feature):
         rate = feature["properties"].get("aging_rate", 0)
@@ -95,7 +104,7 @@ def add_choropleth_layer(care_map, geojson_data, df_pop):
         }
 
     geojson_layer = folium.GeoJson(
-        geojson_data,
+        display_geojson,
         name="행정동 고령화율 (Choropleth)",
         style_function=style_function,
         tooltip=folium.GeoJsonTooltip(
@@ -176,7 +185,7 @@ def main():
 
     # 레이어 추가
     if show_choropleth:
-        add_choropleth_layer(care_map, geojson_data, df_pop)
+        add_choropleth_layer(care_map, geojson_data, df_pop, selected_district)
 
     add_facility_markers(care_map, df_fac, show_hospitals, show_centers)
 
@@ -191,7 +200,7 @@ def main():
         valid_count = len(df_fac[df_fac['is_coord_valid'] == 1])
         st.success(f"📌 지도 표시 시설: **{valid_count:,}개소**")
     with col3:
-        st.warning("💡 범례: 고령화율 25%+ (진한빨강) ~ 14%미만 (연노랑)")
+        st.warning("💡 범례: 고령화율 30%+ (진한버건디) ~ 16%미만 (연노랑)")
 
     # Streamlit에 Folium 지도 렌더링 (returned_objects=[] 로 단방향 경량 모드 활성화)
     st_folium(care_map, width="100%", height=600, returned_objects=[])
