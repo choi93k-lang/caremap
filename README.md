@@ -30,7 +30,7 @@ uv run python scripts/create_mock_data.py
 
 ### 3) Streamlit 대시보드 실행
 ```bash
-uv run streamlit run app.py
+uv run streamlit run Home.py
 ```
 브라우저에서 `http://localhost:8501`로 접속하여 확인합니다.
 
@@ -56,7 +56,8 @@ uv run streamlit run app.py
 │   ├── 2_시니어지도.py                # [Page 2] Folium 고령화율 지도 및 시설 마커
 │   ├── 3_지역비교.py                  # [Page 3] 사분면 산점도 및 행정동 1:1 비교
 │   └── 4_상세및품질.py                # [Page 4] 행정동 시설 테이블, 결측치, 데이터 출처
-├── app.py                             # Streamlit 홈 진입점
+├── Home.py                            # Streamlit 홈 진입점
+├── 구현계획서.md                      # 프로젝트 요구사항 및 5일 구현 계획서
 ├── pyproject.toml                     # 프로젝트 및 의존성 설정
 ├── uv.lock                            # 의존성 락파일
 └── README.md                          # 프로젝트 안내서
