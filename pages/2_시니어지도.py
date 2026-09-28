@@ -60,8 +60,46 @@ def create_base_map(center_lat, center_lon, zoom_level):
     return care_map
 
 
+def add_boundary_lines(care_map, geojson_data, selected_district="전체"):
+    """행정동 테두리 구역선만 지도에 표시하여 항상 경계가 보이도록 합니다."""
+    if not geojson_data:
+        return
+
+    # 선택된 구·군에 해당하는 폴리곤만 필터링
+    filtered_features = []
+    for feature in geojson_data["features"]:
+        props = feature["properties"]
+        f_district = props.get("district_name") or props.get("sggnm")
+        if selected_district == "전체" or f_district == selected_district:
+            filtered_features.append(feature)
+
+    boundary_geojson = {
+        "type": "FeatureCollection",
+        "features": filtered_features
+    }
+
+    def boundary_style(feature):
+        return {
+            "fill": False,
+            "color": "#555555",
+            "weight": 1.5,
+            "dashArray": "2, 4"  # 깔끔한 점선 구역선
+        }
+
+    folium.GeoJson(
+        boundary_geojson,
+        name="행정동 구역선 (기본)",
+        style_function=boundary_style,
+        tooltip=folium.GeoJsonTooltip(
+            fields=["dong_name"],
+            aliases=["행정동:"],
+            localize=True
+        )
+    ).add_to(care_map)
+
+
 def add_choropleth_layer(care_map, geojson_data, df_pop, selected_district="전체"):
-    """선택된 구·군에 맞춰 행정동별 고령화율 단계구분도 레이어를 추가합니다."""
+    """행정동별 고령화율 색상 채우기 레이어를 추가합니다."""
     if not geojson_data:
         return
 
@@ -98,14 +136,14 @@ def add_choropleth_layer(care_map, geojson_data, df_pop, selected_district="전�
         rate = feature["properties"].get("aging_rate", 0)
         return {
             "fillColor": get_color_by_rate(rate),
-            "color": "#333333",
-            "weight": 1.5,
-            "fillOpacity": 0.55
+            "color": "#777777",
+            "weight": 0.5,
+            "fillOpacity": 0.5
         }
 
     geojson_layer = folium.GeoJson(
         display_geojson,
-        name="행정동 고령화율 (Choropleth)",
+        name="🎨 고령화율 색상 채우기",
         style_function=style_function,
         tooltip=folium.GeoJsonTooltip(
             fields=["dong_name", "aging_rate", "total_pop", "elderly_pop"],
@@ -183,10 +221,14 @@ def main():
     center_info = DISTRICT_CENTERS.get(selected_district, DISTRICT_CENTERS["전체"])
     care_map = create_base_map(center_info[0], center_info[1], center_info[2])
 
-    # 레이어 추가
+    # 1. 행정동 기본 테두리 구역선 (항상 지도에 표시)
+    add_boundary_lines(care_map, geojson_data, selected_district)
+
+    # 2. 고령화율 색상 채우기 레이어 (토글 가능)
     if show_choropleth:
         add_choropleth_layer(care_map, geojson_data, df_pop, selected_district)
 
+    # 3. 의료 및 복지 시설 마커
     add_facility_markers(care_map, df_fac, show_hospitals, show_centers)
 
     # 레이어 컨트롤 추가
