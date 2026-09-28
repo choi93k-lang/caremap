@@ -219,9 +219,14 @@ def insert_facilities_ulsan_wide(connection, dong_centroids, inserted_dongs):
         num_hospitals = max(3, min(12, int(elderly_pop / 500) + random.randint(1, 4)))
         for i in range(num_hospitals):
             h_title = f"{dong} {random.choice(['연세', '한마음', '속편한', '참조은', '바른', '울산', '행복', '우리'])}{random.choice(hospital_names)}"
-            # 동 중심 좌표에서 약 400~800m 내외 분산
-            h_lat = round(c_lat + random.uniform(-0.005, 0.005), 6)
-            h_lon = round(c_lon + random.uniform(-0.005, 0.005), 6)
+            
+            # 해안가(방어동 등)는 바다 침범을 막기 위해 실제 주민센터/주거단지 중심 좌표 사용
+            base_h_lat = 35.485 if dong == "방어동" else c_lat
+            base_h_lon = 129.418 if dong == "방어동" else c_lon
+
+            # 동 중심 좌표에서 약 200~400m 내외 안전한 육지 분산
+            h_lat = round(base_h_lat + random.uniform(-0.003, 0.003), 6)
+            h_lon = round(base_h_lon + random.uniform(-0.003, 0.003), 6)
             h_addr = f"울산광역시 {district} {dong} 번영로 {random.randint(10, 450)}"
             tel = f"052-{random.randint(210, 290)}-{random.randint(1000, 9999)}"
 
@@ -245,8 +250,14 @@ def insert_facilities_ulsan_wide(connection, dong_centroids, inserted_dongs):
             num_centers = max(3, min(10, int(elderly_pop / 600) + random.randint(2, 4)))
             for j in range(num_centers):
                 c_title = f"{dong} 제{j+1}경로당"
-                c_lat = round(c_lat + random.uniform(-0.006, 0.006), 6)
-                c_lon = round(c_lon + random.uniform(-0.006, 0.006), 6)
+                
+                # 방어동 등 해안가 행정동은 꽃바위/행정복지센터 권역 육지 좌표로 고정
+                base_c_lat = 35.485 if dong == "방어동" else c_lat
+                base_c_lon = 129.418 if dong == "방어동" else c_lon
+
+                # 변수를 덮어쓰지 않고 항상 기준 좌표에서 분산 계산 (바다 누적 이동 버그 해결)
+                center_lat = round(base_c_lat + random.uniform(-0.003, 0.003), 6)
+                center_lon = round(base_c_lon + random.uniform(-0.003, 0.003), 6)
                 c_addr = f"울산광역시 {district} {dong} 마을길 {random.randint(1, 150)}"
                 tel = f"052-{random.randint(220, 295)}-{random.randint(1000, 9999)}"
 
@@ -256,7 +267,7 @@ def insert_facilities_ulsan_wide(connection, dong_centroids, inserted_dongs):
                         road_address, latitude, longitude, tel_number, is_coord_valid
                     )
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (code, "senior_center", c_title, c_addr, c_lat, c_lon, tel, 1))
+                """, (code, "senior_center", c_title, c_addr, center_lat, center_lon, tel, 1))
                 total_other_centers += 1
 
     connection.commit()

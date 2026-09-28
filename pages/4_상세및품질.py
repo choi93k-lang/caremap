@@ -56,9 +56,9 @@ def render_dong_profile(selected_district):
     )
 
 def render_data_quality_section():
-    """데이터 품질(좌표 결측치 등) 현황을 분석하여 표시합니다."""
+    """데이터 품질(좌표 결측치 및 이상치) 현황을 분석하여 표시합니다."""
     st.markdown("---")
-    st.subheader("🛡️ 데이터 품질 및 결측치 현황")
+    st.subheader("🛡️ 데이터 품질 점검 (결측치 및 이상치)")
 
     connection = get_db_connection()
     df_fac_all = pd.read_sql_query("SELECT * FROM facility", connection)
@@ -69,16 +69,41 @@ def render_data_quality_section():
     missing_count = total_count - valid_count
     missing_rate = round((missing_count / total_count) * 100, 2) if total_count > 0 else 0
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("전체 적재 시설 수", f"{total_count:,}건")
-    col2.metric("정상 좌표 매핑 건수", f"{valid_count:,}건", delta=f"{100-missing_rate:.1f}% 유효")
-    col3.metric("위·경도 결측 건수", f"{missing_count:,}건", delta=f"-{missing_rate:.2f}% 결측", delta_color="inverse")
+    # 울산광역시 정상 위·경도 범위 (위도: 35.35 ~ 35.70, 경도: 129.05 ~ 129.45)
+    min_lat, max_lat = 35.35, 35.70
+    min_lon, max_lon = 129.05, 129.45
 
+    # 유효 좌표 중 울산 범위를 벗어난 이상치(Outlier) 확인
+    df_valid = df_fac_all[df_fac_all["is_coord_valid"] == 1]
+    outlier_condition = (
+        (df_valid["latitude"] < min_lat) | (df_valid["latitude"] > max_lat) |
+        (df_valid["longitude"] < min_lon) | (df_valid["longitude"] > max_lon)
+    )
+    df_outliers = df_valid[outlier_condition]
+    outlier_count = len(df_outliers)
+
+    # 4개 핵심 지표 카드 배치
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("전체 시설 수", f"{total_count:,}건")
+    col2.metric("정상 좌표 시설", f"{valid_count:,}건", delta=f"{100-missing_rate:.1f}% 유효")
+    col3.metric("좌표 결측치", f"{missing_count:,}건", delta=f"-{missing_rate:.2f}% 결측", delta_color="inverse")
+    col4.metric("좌표 이상치", f"{outlier_count:,}건", delta="0건 정상" if outlier_count == 0 else "주의 필요", delta_color="normal" if outlier_count == 0 else "inverse")
+
+    # 결측치 목록 보기
     if missing_count > 0:
-        with st.expander(f"⚠️ 좌표 결측 시설 목록 확인 ({missing_count}건)"):
-            st.caption("아래 시설들은 주소 정제 과정에서 좌표 변환이 실패하여 지도 화면에서는 제외되었습니다.")
+        with st.expander(f"⚠️ 좌표 결측 시설 목록 ({missing_count}건)"):
+            st.caption("주소 정제 과정에서 좌표 변환이 되지 않은 결측 시설들입니다.")
             missing_df = df_fac_all[df_fac_all["is_coord_valid"] == 0][["facility_name", "facility_type", "road_address", "tel_number"]]
             st.dataframe(missing_df, use_container_width=True)
+
+    # 이상치 목록 보기
+    if outlier_count > 0:
+        with st.expander(f"🚨 울산 경계 이탈 이상치 시설 ({outlier_count}건)"):
+            st.caption("울산광역시 행정 경계(위도 35.35~35.70, 경도 129.05~129.45)를 벗어난 비정상 좌표입니다.")
+            outlier_display = df_outliers[["facility_name", "facility_type", "latitude", "longitude", "road_address"]]
+            st.dataframe(outlier_display, use_container_width=True)
+    else:
+        st.success("✅ **울산 경계 이탈 이상치 0건**: 모든 정상 좌표 시설이 울산광역시 관할 구역 내에 올바르게 위치하고 있습니다.")
 
 def render_data_sources_and_limitations():
     """데이터 출처 및 라이선스, 분석상 한계점을 안내합니다."""
