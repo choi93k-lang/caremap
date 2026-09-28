@@ -6,8 +6,6 @@ from folium.plugins import MarkerCluster
 from streamlit_folium import st_folium
 from database.db_manager import get_all_districts, get_facilities, get_population_summary
 
-st.set_page_config(page_title="시니어 케어 지도 - 울산 시니어 케어맵", page_icon="🗺️", layout="wide")
-
 GEOJSON_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "ulsan_dong.geojson")
 
 # 구·군별 지도 중심 좌표

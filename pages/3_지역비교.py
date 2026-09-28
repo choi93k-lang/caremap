@@ -3,8 +3,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 from database.db_manager import get_region_comparison_data, get_all_districts
 
-st.set_page_config(page_title="지역 비교 및 탐색 - 울산 시니어 케어맵", page_icon="⚖️", layout="wide")
-
 def render_scatter_section(df_comp):
     """사분면 산점도를 렌더링하고 탐색 가이드를 제공합니다."""
     st.subheader("🔍 고령화율 vs 인구 대비 시설 공급 사분면 분석")

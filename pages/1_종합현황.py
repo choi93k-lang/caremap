@@ -8,8 +8,6 @@ from database.db_manager import (
     get_region_comparison_data
 )
 
-st.set_page_config(page_title="종합 현황 - 울산 시니어 케어맵", page_icon="📊", layout="wide")
-
 def render_sidebar():
     """사이드바 필터를 렌더링하고 선택된 구·군 이름을 반환합니다."""
     st.sidebar.header("🔍 검색 및 필터")

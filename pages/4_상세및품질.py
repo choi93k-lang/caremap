@@ -7,8 +7,6 @@ from database.db_manager import (
     get_db_connection
 )
 
-st.set_page_config(page_title="상세 정보 및 데이터 품질 - 울산 시니어 케어맵", page_icon="📋", layout="wide")
-
 def render_dong_profile(selected_district):
     """선택된 구·군 및 행정동의 상세 정보와 시설 목록을 표시합니다."""
     st.subheader("🏘️ 행정동별 세부 시설 프로필")
