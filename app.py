@@ -1,4 +1,13 @@
+import sys
 import streamlit as st
+from streamlit.runtime import exists
+
+# VS Code 재생(▶) 버튼이나 'python app.py'로 일반 실행 시 자동으로 스트림릿 웹 서버 실행
+if __name__ == "__main__" and not exists():
+    from streamlit.web import cli as stcli
+    sys.argv = ["streamlit", "run", sys.argv[0]]
+    sys.exit(stcli.main())
+
 from database.db_manager import get_population_summary, get_facilities
 
 # 전체 앱의 전역 페이지 설정 (st.navigation 사용 시 메인 진입점에서 1회만 호출)
