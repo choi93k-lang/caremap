@@ -28,9 +28,9 @@ def load_geojson_data():
     return None
 
 
-@st.cache_data
+@st.cache_data(ttl=60)
 def get_cached_map_data(district_name):
-    """구·군별 인구 및 시설 데이터를 캐싱하여 로드합니다."""
+    """구·군별 인구 및 시설 데이터를 캐싱하여 로드합니다 (DB 갱신 반영을 위해 60초 주기 갱신)."""
     df_pop = get_population_summary(district_name)
     df_fac = get_facilities(district_name, "all")
     return df_pop, df_fac
