@@ -217,17 +217,17 @@ def insert_facilities_ulsan_wide(connection, dong_centroids, inserted_dongs):
         else:
             c_lat, c_lon = 35.538, 129.311  # 기본 울산 중심
 
-        # 동구 등 해안가 행정동은 바다 침범을 완벽히 방지하기 위해 확실한 서쪽 내륙 주거지 좌표 고정
-        DONGGU_INLAND_COORDS = {
-            "방어동": (35.4880, 129.4150),   # 방어진/꽃바위 내륙
-            "일산동": (35.5010, 129.4180),   # 동구청 서쪽 내륙 주거단지 (해변과 1.3km 이상 이격)
-            "화정동": (35.4960, 129.4160),   # 울산과학대 서쪽 내륙
-            "대송동": (35.5070, 129.4100),   # 완전 내륙
-            "전하1동": (35.5200, 129.4180),  # 전하푸르지오/아이파크 주거지
-            "전하2동": (35.5120, 129.4180),  # 전하초/한마음회관 내륙
-            "남목1동": (35.5380, 129.4120),  # 남목시장 내륙
-            "남목2동": (35.5280, 129.4160),  # 서부동 아파트단지 내륙
-            "남목3동": (35.5450, 129.4180),  # 안남목 내륙
+        # 동구 9개 행정동 실제 행정복지센터(주민센터) 기준 실제 주거지 중심 좌표 매핑
+        DONGGU_CENTER_COORDS = {
+            "방어동": (35.4863, 129.4240),   # 방어동 행정복지센터 (문현로 325, 꽃바위 주거지)
+            "일산동": (35.4980, 129.4263),   # 일산동 행정복지센터 (번영로 30, 일산동 주거지)
+            "화정동": (35.4959, 129.4226),   # 화정동 행정복지센터 (대송로 140, 울산과학대 권역)
+            "대송동": (35.5032, 129.4184),   # 대송동 행정복지센터 (대송5길 10, 대송시장 인근)
+            "전하1동": (35.5168, 129.4286),  # 전하1동 행정복지센터 (바드래3길 55, 아파트 밀집 주거지)
+            "전하2동": (35.5089, 129.4267),  # 전하2동 행정복지센터 (진성4길 45, 전하초/한마음회관 주거지)
+            "남목1동": (35.5392, 129.4208),  # 남목1동 행정복지센터 (방어진순환도로 1170, 남목시장 주거지)
+            "남목2동": (35.5246, 129.4314),  # 남목2동 행정복지센터 (미포6길 33, 현대패밀리서부 주거지)
+            "남목3동": (35.5461, 129.4314),  # 남목3동 행정복지센터 (남목해안로 100, 안남목 주거지)
         }
 
         # (1) 병·의원 생성 (고령 인구 규모에 비례하여 4~10개소 배치)
@@ -235,14 +235,14 @@ def insert_facilities_ulsan_wide(connection, dong_centroids, inserted_dongs):
         for i in range(num_hospitals):
             h_title = f"{dong} {random.choice(['연세', '한마음', '속편한', '참조은', '바른', '울산', '행복', '우리'])}{random.choice(hospital_names)}"
             
-            if dong in DONGGU_INLAND_COORDS:
-                base_h_lat, base_h_lon = DONGGU_INLAND_COORDS[dong]
-                spread = 0.0015  # 해안선 침범을 원천 차단하는 약 120m 안전 분산
+            if dong in DONGGU_CENTER_COORDS:
+                base_h_lat, base_h_lon = DONGGU_CENTER_COORDS[dong]
+                spread = 0.0020  # 실제 주거지 골목 반경 약 180m 내외 자연스러운 분산
             else:
                 base_h_lat, base_h_lon = c_lat, c_lon
                 spread = 0.0030
 
-            # 안전한 내륙 분산
+            # 자연스러운 주거지 분산
             h_lat = round(base_h_lat + random.uniform(-spread, spread), 6)
             h_lon = round(base_h_lon + random.uniform(-spread, spread), 6)
             h_addr = f"울산광역시 {district} {dong} 번영로 {random.randint(10, 450)}"
@@ -269,10 +269,10 @@ def insert_facilities_ulsan_wide(connection, dong_centroids, inserted_dongs):
             for j in range(num_centers):
                 c_title = f"{dong} 제{j+1}경로당"
                 
-                # 동구 등 해안가 행정동은 확실한 내륙 주거지 좌표 사용
-                if dong in DONGGU_INLAND_COORDS:
-                    base_c_lat, base_c_lon = DONGGU_INLAND_COORDS[dong]
-                    c_spread = 0.0015
+                # 동구 등 해안가 행정동은 실제 주민센터 주거지 좌표 사용
+                if dong in DONGGU_CENTER_COORDS:
+                    base_c_lat, base_c_lon = DONGGU_CENTER_COORDS[dong]
+                    c_spread = 0.0020
                 else:
                     base_c_lat, base_c_lon = c_lat, c_lon
                     c_spread = 0.0030

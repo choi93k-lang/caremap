@@ -81,11 +81,16 @@ def render_data_quality_section():
         (df_valid["latitude"] < min_lat) | (df_valid["latitude"] > max_lat) |
         (df_valid["longitude"] < min_lon) | (df_valid["longitude"] > max_lon)
     )
-    # 2) 동구 해안선 이탈 (위도 35.45~35.58 권역에서 경도 129.428 초과 시 동해 바다 침범으로 판정)
-    sea_outlier = (
-        (df_valid["latitude"] >= 35.45) & (df_valid["latitude"] <= 35.58) &
-        (df_valid["longitude"] > 129.428)
+    # 2) 동구 해안선 이탈 (일산만 해수욕장 129.431 초과 또는 방어진 동단 129.435 초과 시 바다 침범으로 판정)
+    ilsan_sea_outlier = (
+        (df_valid["latitude"] >= 35.490) & (df_valid["latitude"] <= 35.505) &
+        (df_valid["longitude"] > 129.431)
     )
+    bangeo_sea_outlier = (
+        (df_valid["latitude"] >= 35.470) & (df_valid["latitude"] < 35.490) &
+        (df_valid["longitude"] > 129.435)
+    )
+    sea_outlier = ilsan_sea_outlier | bangeo_sea_outlier
     outlier_condition = box_outlier | sea_outlier
     df_outliers = df_valid[outlier_condition]
     outlier_count = len(df_outliers)
