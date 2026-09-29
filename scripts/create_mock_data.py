@@ -1,8 +1,9 @@
 import os
 import sys
 
-# 프로젝트 루트 디렉터리를 sys.path에 추가하여 database 모듈을 임포트할 수 있도록 설정
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# 프로젝트 루트 디렉터리 경로 설정 (어느 위치에서 실행해도 안전하도록 기준 경로를 잡음)
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(BASE_DIR)
 
 import re
 import random
@@ -113,7 +114,7 @@ def insert_sources(connection):
 
 def load_namgu_real_population():
     """실제 다운로드받은 남구 인구 통계 CSV 파일을 읽어 딕셔너리로 반환합니다."""
-    csv_path = os.path.join("data", "raw", "ulsan_namgu_population.csv")
+    csv_path = os.path.join(BASE_DIR, "data", "raw", "ulsan_namgu_population.csv")
     pop_map = {}
     if not os.path.exists(csv_path):
         return pop_map
@@ -203,7 +204,7 @@ def insert_facilities(connection):
     cursor = connection.cursor()
 
     # 1. 실제 남구 경로당 데이터 로드 시도
-    namgu_senior_csv = os.path.join("data", "raw", "ulsan_namgu_senior_center.csv")
+    namgu_senior_csv = os.path.join(BASE_DIR, "data", "raw", "ulsan_namgu_senior_center.csv")
     namgu_loaded = False
 
     if os.path.exists(namgu_senior_csv):

@@ -6,16 +6,18 @@ import random
 import sqlite3
 import pandas as pd
 
-# 루트 경로를 sys.path에 추가하여 database 패키지 참조
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# 프로젝트 루트 디렉터리 경로 설정 (어느 위치에서 실행해도 안전하도록 기준 경로를 잡음)
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(BASE_DIR)
 from database.db_manager import get_db_connection, create_tables
 
 # 재현성을 위한 시드
 random.seed(42)
 
-GEOJSON_FILE = os.path.join("data", "ulsan_dong.geojson")
-REAL_POPULATION_CSV = os.path.join("data", "raw", "ulsan_population_real.csv")
-NAMGU_SENIOR_CSV = os.path.join("data", "raw", "ulsan_namgu_senior_center.csv")
+# 프로젝트 루트(BASE_DIR) 기준 파일 경로 설정
+GEOJSON_FILE = os.path.join(BASE_DIR, "data", "ulsan_dong.geojson")
+REAL_POPULATION_CSV = os.path.join(BASE_DIR, "data", "raw", "ulsan_population_real.csv")
+NAMGU_SENIOR_CSV = os.path.join(BASE_DIR, "data", "raw", "ulsan_namgu_senior_center.csv")
 
 
 def clear_database(connection):
