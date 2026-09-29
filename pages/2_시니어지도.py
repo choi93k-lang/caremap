@@ -37,17 +37,17 @@ def get_cached_map_data(district_name):
 
 
 def get_color_by_rate(rate):
-    """실제 울산 통계 기준(12%~55%)에 맞춘 고령화율 단계 색상을 반환합니다."""
+    """실제 울산 통계 기준(12%~55%)에 맞춘 고령화율 단계 색상(초록-노랑-빨강)을 반환합니다."""
     if rate >= 30.0:
-        return "#990000"  # 30% 이상: 초고령 심화 지역
+        return "#D7191C"  # 30% 이상: 진한 빨간색 (초고령 심화 지역)
     elif rate >= 25.0:
-        return "#D7301F"  # 25% ~ 30%
+        return "#FDAE61"  # 25% ~ 30%: 주황-빨간색
     elif rate >= 20.0:
-        return "#FC8D59"  # 20% ~ 25%: 초고령사회 진입 기준
+        return "#FEE08B"  # 20% ~ 25%: 따뜻한 노란색 (초고령사회 진입 기준)
     elif rate >= 16.0:
-        return "#FDBB84"  # 16% ~ 20%
+        return "#A6D96A"  # 16% ~ 20%: 연한 연두색
     else:
-        return "#FEF0D9"  # 16% 미만: 상대적 젊은 신도심
+        return "#1A9641"  # 16% 미만: 맑은 초록색 (상대적 젊은 신도심)
 
 
 def create_base_map(center_lat, center_lon, zoom_level):
@@ -65,26 +65,37 @@ def add_boundary_lines(care_map, geojson_data, selected_district="전체"):
     if not geojson_data:
         return
 
-    # 선택된 구·군에 해당하는 폴리곤만 필터링
-    filtered_features = []
+    # 모든 행정동 구역선을 표시하되, 선택된 구는 진하게, 다른 구는 연하게 표시
+    display_features = []
     for feature in geojson_data["features"]:
-        props = feature["properties"]
+        feature_copy = dict(feature)
+        props = dict(feature["properties"])
         f_district = props.get("district_name") or props.get("sggnm")
-        if selected_district == "전체" or f_district == selected_district:
-            filtered_features.append(feature)
+        props["is_selected"] = (selected_district == "전체" or f_district == selected_district)
+        feature_copy["properties"] = props
+        display_features.append(feature_copy)
 
     boundary_geojson = {
         "type": "FeatureCollection",
-        "features": filtered_features
+        "features": display_features
     }
 
     def boundary_style(feature):
-        return {
-            "fill": False,
-            "color": "#555555",
-            "weight": 1.5,
-            "dashArray": "2, 4"  # 깔끔한 점선 구역선
-        }
+        is_selected = feature["properties"].get("is_selected", True)
+        if is_selected:
+            return {
+                "fill": False,
+                "color": "#333333",
+                "weight": 1.5,
+                "dashArray": "2, 4"  # 선택된 구: 또렷한 점선 구역선
+            }
+        else:
+            return {
+                "fill": False,
+                "color": "#CCCCCC",
+                "weight": 0.8,
+                "dashArray": "3, 3"  # 다른 구: 옅은 점선 구역선
+            }
 
     folium.GeoJson(
         boundary_geojson,
@@ -99,7 +110,7 @@ def add_boundary_lines(care_map, geojson_data, selected_district="전체"):
 
 
 def add_choropleth_layer(care_map, geojson_data, df_pop, selected_district="전체"):
-    """행정동별 고령화율 색상 채우기 레이어를 추가합니다."""
+    """행정동별 고령화율 색상 채우기 레이어를 추가합니다. (선택된 구는 강조, 다른 구는 흐리게)"""
     if not geojson_data:
         return
 
@@ -114,32 +125,50 @@ def add_choropleth_layer(care_map, geojson_data, df_pop, selected_district="전�
             "elderly": row["elderly_population"]
         }
 
-    # 선택된 구·군에 해당하는 폴리곤만 필터링
-    filtered_features = []
+    # 모든 행정동을 포함하되, 선택 구역과 비선택 구역을 구분
+    display_features = []
     for feature in geojson_data["features"]:
-        props = feature["properties"]
+        feature_copy = dict(feature)
+        props = dict(feature["properties"])
         f_district = props.get("district_name") or props.get("sggnm")
-        if selected_district == "전체" or f_district == selected_district:
-            code = str(props.get("adm_cd2", ""))
-            info = pop_lookup.get(code, {"dong": props.get("dong_name", "미상"), "rate": 0, "total": 0, "elderly": 0})
-            props["aging_rate"] = info["rate"]
-            props["total_pop"] = info["total"]
-            props["elderly_pop"] = info["elderly"]
-            filtered_features.append(feature)
+        is_selected = (selected_district == "전체" or f_district == selected_district)
+        props["is_selected"] = is_selected
+
+        code = str(props.get("adm_cd2", ""))
+        info = pop_lookup.get(code, {"dong": props.get("dong_name", "미상"), "rate": 0, "total": 0, "elderly": 0})
+        props["aging_rate"] = info["rate"]
+        props["total_pop"] = info["total"]
+        props["elderly_pop"] = info["elderly"]
+
+        feature_copy["properties"] = props
+        display_features.append(feature_copy)
 
     display_geojson = {
         "type": "FeatureCollection",
-        "features": filtered_features
+        "features": display_features
     }
 
     def style_function(feature):
-        rate = feature["properties"].get("aging_rate", 0)
-        return {
-            "fillColor": get_color_by_rate(rate),
-            "color": "#777777",
-            "weight": 0.5,
-            "fillOpacity": 0.5
-        }
+        props = feature["properties"]
+        is_selected = props.get("is_selected", True)
+
+        if is_selected:
+            # 선택된 구: 고령화율에 따른 선명한 색상 채우기
+            rate = props.get("aging_rate", 0)
+            return {
+                "fillColor": get_color_by_rate(rate),
+                "color": "#555555",
+                "weight": 1.0,
+                "fillOpacity": 0.6
+            }
+        else:
+            # 선택되지 않은 주변 구: 옅은 회색으로 흐리게 처리 (Dimming)
+            return {
+                "fillColor": "#E0E0E0",
+                "color": "#D0D0D0",
+                "weight": 0.5,
+                "fillOpacity": 0.15
+            }
 
     geojson_layer = folium.GeoJson(
         display_geojson,
@@ -188,9 +217,9 @@ def add_facility_markers(care_map, df_fac, show_hospitals, show_centers):
             folium.CircleMarker(
                 location=[row["latitude"], row["longitude"]],
                 radius=4,
-                color="#2ECC71",
+                color="#7B1FA2",
                 fill=True,
-                fill_color="#2ECC71",
+                fill_color="#9C27B0",
                 fill_opacity=0.85,
                 tooltip=f"👵 {row['facility_name']}",
                 popup=folium.Popup(popup_text, max_width=240)
@@ -209,8 +238,8 @@ def main():
 
     st.sidebar.markdown("---")
     st.sidebar.subheader("시설 표시 토글")
-    show_hospitals = st.sidebar.checkbox("🏥 병·의원 마커 표시", value=True)
-    show_centers = st.sidebar.checkbox("👵 경로당 마커 표시", value=True)
+    show_hospitals = st.sidebar.checkbox("🏥 병·의원 마커 표시 (파랑)", value=True)
+    show_centers = st.sidebar.checkbox("👵 경로당 마커 표시 (보라)", value=True)
     show_choropleth = st.sidebar.checkbox("🎨 행정동 고령화율 단계구분도 표시", value=True)
 
     # 캐싱된 데이터 로드
@@ -242,7 +271,7 @@ def main():
         valid_count = len(df_fac[df_fac['is_coord_valid'] == 1])
         st.success(f"📌 지도 표시 시설: **{valid_count:,}개소**")
     with col3:
-        st.warning("💡 범례: 고령화율 30%+ (진한버건디) ~ 16%미만 (연노랑)")
+        st.warning("💡 범례: 30%+ (진한빨강) / 20~25% (노랑) / 16%미만 (초록)")
 
     # Streamlit에 Folium 지도 렌더링 (returned_objects=[] 로 단방향 경량 모드 활성화)
     st_folium(care_map, width="100%", height=600, returned_objects=[])
