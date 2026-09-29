@@ -28,6 +28,8 @@ from database.db_manager import get_db_connection, create_tables
 GEOJSON_FILE = os.path.join(BASE_DIR, "data", "ulsan_dong.geojson")
 REAL_POPULATION_CSV = os.path.join(BASE_DIR, "data", "raw", "ulsan_population_real.csv")
 NAMGU_SENIOR_CSV = os.path.join(BASE_DIR, "data", "raw", "ulsan_namgu_senior_center.csv")
+DONGGU_SENIOR_CSV = os.path.join(BASE_DIR, "data", "raw", "ulsan_donggu_senior_raw.csv")
+DONGGU_SENIOR_COORDS = os.path.join(BASE_DIR, "data", "raw", "donggu_senior_coords.json")
 MEDICAL_RAW_CSV = os.path.join(BASE_DIR, "data", "raw", "ulsan_medical_raw.csv")
 COORDS_CACHE_FILE = os.path.join(BASE_DIR, "data", "raw", "medical_coords_cache.json")
 
@@ -49,6 +51,7 @@ def insert_source_records(connection):
         ("행정안전부 주민등록 인구통계", "행정안전부", "https://jumin.mois.go.kr/etcStatOldAge.do", "2026-08"),
         ("울산광역시 의료기관 현황", "울산광역시 / 공공데이터포털", "https://www.data.go.kr/data/15055025/fileData.do", "2026-09"),
         ("울산광역시 남구 경로당 현황", "울산광역시 남구청 / 공공데이터포털", "https://www.data.go.kr/data/15021200/fileData.do", "2026-06"),
+        ("울산광역시 동구 노인여가복지시설", "울산광역시 동구청 / 공공데이터포털", "https://www.data.go.kr/data/15072556/fileData.do", "2026-06"),
         ("울산광역시 행정동 경계 지도 (GeoJSON)", "통계청 SGIS", "https://sgis.kostat.go.kr", "2026-01")
     ]
     cursor = connection.cursor()
@@ -57,7 +60,7 @@ def insert_source_records(connection):
         VALUES (?, ?, ?, ?)
     """, sources)
     connection.commit()
-    print("[알림] 공식 공공데이터 출처 4건 등록 완료")
+    print("[알림] 공식 공공데이터 출처 5건 등록 완료")
 
 
 def get_dong_centroids():
@@ -260,6 +263,60 @@ def insert_namgu_senior_centers(connection, inserted_dongs):
     return loaded_count
 
 
+def insert_donggu_senior_centers(connection, inserted_dongs, dong_centroids):
+    """동구청 공공데이터 포털에서 내려받은 실제 경로당을 적재합니다."""
+    cursor = connection.cursor()
+    if not os.path.exists(DONGGU_SENIOR_CSV):
+        print(f"[경고] 동구 경로당 원본 파일이 없습니다: {DONGGU_SENIOR_CSV}")
+        return 0
+
+    coords_cache = {}
+    if os.path.exists(DONGGU_SENIOR_COORDS):
+        try:
+            with open(DONGGU_SENIOR_COORDS, "r", encoding="utf-8") as f:
+                coords_cache = json.load(f)
+        except Exception:
+            coords_cache = {}
+
+    df_senior = pd.read_csv(DONGGU_SENIOR_CSV, encoding="cp949")
+    df_senior = df_senior[df_senior["분류"] == "경로당"]
+    loaded_count = 0
+    valid_coord_count = 0
+
+    for _, row in df_senior.iterrows():
+        facility_name = str(row["시설명"]).strip()
+        road_addr = f"울산광역시 동구 {str(row.get('주소', '')).strip()}"
+
+        coord_info = coords_cache.get(facility_name)
+        if coord_info:
+            lat = coord_info["lat"]
+            lon = coord_info["lon"]
+            is_valid = 1
+            valid_coord_count += 1
+        else:
+            lat = None
+            lon = None
+            is_valid = 0
+
+        # 동구 9개 행정동 매칭
+        matched_code = match_dong_code(
+            "동구", road_addr, facility_name, lat, lon, inserted_dongs, dong_centroids
+        )
+
+        cursor.execute("""
+            INSERT INTO facility (
+                region_code, facility_type, facility_name, 
+                road_address, latitude, longitude, tel_number, is_coord_valid
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (matched_code, "senior_center", facility_name, road_addr, lat, lon, "", is_valid))
+        loaded_count += 1
+
+    connection.commit()
+    print(f"[성공] 동구 실제 경로당 {loaded_count}개소 적재 완료 (정밀 좌표 매핑: {valid_coord_count}개소)")
+    return loaded_count
+
+
 def insert_real_medical_facilities(connection, inserted_dongs, dong_centroids):
     """
     공공데이터포털 울산광역시 의료기관 현황 원본(1,401개)을 파싱하여
@@ -353,7 +410,10 @@ def main():
     # 6. 남구 실제 경로당 적재 (133개소)
     insert_namgu_senior_centers(connection, inserted_dongs)
 
-    # 7. 울산 전역 100% 실제 의료기관 적재 (1,401개소)
+    # 7. 동구 실제 경로당 적재 (60개소)
+    insert_donggu_senior_centers(connection, inserted_dongs, dong_centroids)
+
+    # 8. 울산 전역 100% 실제 의료기관 적재 (1,401개소)
     insert_real_medical_facilities(connection, inserted_dongs, dong_centroids)
 
     connection.close()
