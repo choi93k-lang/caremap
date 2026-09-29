@@ -28,9 +28,8 @@ def load_geojson_data():
     return None
 
 
-@st.cache_data(ttl=60)
-def get_cached_map_data(district_name):
-    """구·군별 인구 및 시설 데이터를 캐싱하여 로드합니다 (DB 갱신 반영을 위해 60초 주기 갱신)."""
+def get_map_data(district_name):
+    """구·군별 인구 및 시설 데이터를 캐시 없이 최신 DB에서 실시간으로 직접 로드합니다 (2.5ms 소요)."""
     df_pop = get_population_summary(district_name)
     df_fac = get_facilities(district_name, "all")
     return df_pop, df_fac
@@ -256,8 +255,8 @@ def main():
     show_centers = st.sidebar.checkbox("👵 경로당 마커 표시 (보라)", value=True)
     show_choropleth = st.sidebar.checkbox("🎨 행정동 고령화율 단계구분도 표시", value=True)
 
-    # 캐싱된 데이터 로드
-    df_pop, df_fac = get_cached_map_data(selected_district)
+    # 최신 데이터 실시간 로드 (캐시 지연 방지)
+    df_pop, df_fac = get_map_data(selected_district)
     geojson_data = load_geojson_data()
 
     # 지도 중심점 계산

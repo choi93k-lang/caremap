@@ -220,14 +220,14 @@ def insert_facilities_ulsan_wide(connection, dong_centroids, inserted_dongs):
         # 동구 등 해안가 행정동은 바다 침범을 완벽히 방지하기 위해 확실한 서쪽 내륙 주거지 좌표 고정
         DONGGU_INLAND_COORDS = {
             "방어동": (35.4880, 129.4150),   # 방어진/꽃바위 내륙
-            "일산동": (35.4985, 129.4220),   # 일산번영로 서쪽 주거단지
-            "화정동": (35.4960, 129.4180),   # 울산과학대 내륙
+            "일산동": (35.5010, 129.4180),   # 동구청 서쪽 내륙 주거단지 (해변과 1.3km 이상 이격)
+            "화정동": (35.4960, 129.4160),   # 울산과학대 서쪽 내륙
             "대송동": (35.5070, 129.4100),   # 완전 내륙
-            "전하1동": (35.5200, 129.4200),  # 전하푸르지오/아이파크 주거지
-            "전하2동": (35.5120, 129.4200),  # 전하초/한마음회관 내륙
+            "전하1동": (35.5200, 129.4180),  # 전하푸르지오/아이파크 주거지
+            "전하2동": (35.5120, 129.4180),  # 전하초/한마음회관 내륙
             "남목1동": (35.5380, 129.4120),  # 남목시장 내륙
-            "남목2동": (35.5280, 129.4180),  # 서부동 아파트단지 내륙
-            "남목3동": (35.5450, 129.4200),  # 안남목 내륙
+            "남목2동": (35.5280, 129.4160),  # 서부동 아파트단지 내륙
+            "남목3동": (35.5450, 129.4180),  # 안남목 내륙
         }
 
         # (1) 병·의원 생성 (고령 인구 규모에 비례하여 4~10개소 배치)
@@ -237,7 +237,7 @@ def insert_facilities_ulsan_wide(connection, dong_centroids, inserted_dongs):
             
             if dong in DONGGU_INLAND_COORDS:
                 base_h_lat, base_h_lon = DONGGU_INLAND_COORDS[dong]
-                spread = 0.0018  # 해안선 침범을 막는 안전한 약 150m 분산
+                spread = 0.0015  # 해안선 침범을 원천 차단하는 약 120m 안전 분산
             else:
                 base_h_lat, base_h_lon = c_lat, c_lon
                 spread = 0.0030
@@ -272,7 +272,7 @@ def insert_facilities_ulsan_wide(connection, dong_centroids, inserted_dongs):
                 # 동구 등 해안가 행정동은 확실한 내륙 주거지 좌표 사용
                 if dong in DONGGU_INLAND_COORDS:
                     base_c_lat, base_c_lon = DONGGU_INLAND_COORDS[dong]
-                    c_spread = 0.0018
+                    c_spread = 0.0015
                 else:
                     base_c_lat, base_c_lon = c_lat, c_lon
                     c_spread = 0.0030
