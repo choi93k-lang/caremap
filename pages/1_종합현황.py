@@ -106,6 +106,7 @@ def render_top_aging_dongs_chart(df_pop):
 def render_district_summary_table(df_comp):
     """구·군별 인구 및 인프라 공급 수준 요약 테이블을 렌더링합니다."""
     st.subheader("📋 구·군별 종합 집계 현황")
+    st.info("💡 **안내:** 표 머리글(헤더)을 클릭하시면 엑셀처럼 오름차순/내림차순 정렬 및 요약 통계를 확인하실 수 있습니다.")
     summary = df_comp.groupby("district_name").agg({
         "total_population": "sum",
         "elderly_population": "sum",
