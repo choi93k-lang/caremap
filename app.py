@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 from database.db_manager import get_population_summary, get_facilities
 
@@ -82,4 +83,11 @@ compare_page = st.Page("pages/3_지역비교.py", title="지역비교", icon="�
 quality_page = st.Page("pages/4_상세및품질.py", title="상세및품질", icon="📋")
 
 pg = st.navigation([home_page, overview_page, map_page, compare_page, quality_page])
+
+# 공통 사이드바 하단: 지도 테마 가이드 이미지 표시
+preview_image_path = os.path.join(os.path.dirname(__file__), "assets", "map_theme_preview.jpg")
+if os.path.exists(preview_image_path):
+    with st.sidebar.expander("🗺️ 지도 테마 가이드 (미리보기)", expanded=True):
+        st.image(preview_image_path, caption="Option A (적용됨) vs Option B", use_container_width=True)
+
 pg.run()

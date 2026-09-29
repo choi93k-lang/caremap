@@ -51,12 +51,26 @@ def get_color_by_rate(rate):
 
 
 def create_base_map(center_lat, center_lon, zoom_level):
-    """기본 타일 지도를 생성합니다."""
+    """기본 타일 지도를 생성하고 마커 클러스터에 보라색 테마 스타일을 주입합니다."""
     care_map = folium.Map(
         location=[center_lat, center_lon],
         zoom_start=zoom_level,
         tiles="OpenStreetMap"
     )
+    # 마커 클러스터 숫자 뱃지가 기본 초록색이 아닌 선명한 보라색으로 표시되도록 CSS 주입
+    custom_cluster_css = """
+    <style>
+    .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large {
+        background-color: rgba(156, 39, 176, 0.4) !important;
+    }
+    .marker-cluster-small div, .marker-cluster-medium div, .marker-cluster-large div {
+        background-color: rgba(123, 31, 162, 0.85) !important;
+        color: white !important;
+        font-weight: bold !important;
+    }
+    </style>
+    """
+    care_map.get_root().html.add_child(folium.Element(custom_cluster_css))
     return care_map
 
 
@@ -153,21 +167,21 @@ def add_choropleth_layer(care_map, geojson_data, df_pop, selected_district="전�
         is_selected = props.get("is_selected", True)
 
         if is_selected:
-            # 선택된 구: 고령화율에 따른 선명한 색상 채우기
+            # 선택된 구: 고령화율에 따른 선명한 색상 및 또렷한 테두리
             rate = props.get("aging_rate", 0)
             return {
                 "fillColor": get_color_by_rate(rate),
-                "color": "#555555",
-                "weight": 1.0,
-                "fillOpacity": 0.6
+                "color": "#222222",
+                "weight": 1.8,
+                "fillOpacity": 0.65
             }
         else:
-            # 선택되지 않은 주변 구: 옅은 회색으로 흐리게 처리 (Dimming)
+            # 선택되지 않은 주변 구: 뚜렷한 미디엄 그레이로 확실하게 톤다운 (Dimming)
             return {
-                "fillColor": "#E0E0E0",
-                "color": "#D0D0D0",
-                "weight": 0.5,
-                "fillOpacity": 0.15
+                "fillColor": "#757575",
+                "color": "#9E9E9E",
+                "weight": 0.8,
+                "fillOpacity": 0.55
             }
 
     geojson_layer = folium.GeoJson(
@@ -216,11 +230,11 @@ def add_facility_markers(care_map, df_fac, show_hospitals, show_centers):
             popup_text = f"<b>👵 {row['facility_name']}</b><br>주소: {row['road_address']}<br>전화: {tel}"
             folium.CircleMarker(
                 location=[row["latitude"], row["longitude"]],
-                radius=4,
-                color="#7B1FA2",
+                radius=5,
+                color="#4A148C",
                 fill=True,
                 fill_color="#9C27B0",
-                fill_opacity=0.85,
+                fill_opacity=0.9,
                 tooltip=f"👵 {row['facility_name']}",
                 popup=folium.Popup(popup_text, max_width=240)
             ).add_to(center_cluster)
