@@ -222,9 +222,13 @@ def insert_facilities_ulsan_wide(connection, dong_centroids, inserted_dongs):
         for i in range(num_hospitals):
             h_title = f"{dong} {random.choice(['연세', '한마음', '속편한', '참조은', '바른', '울산', '행복', '우리'])}{random.choice(hospital_names)}"
             
-            # 해안가(방어동 등)는 바다 침범을 막기 위해 실제 주민센터/주거단지 중심 좌표 사용
-            base_h_lat = 35.485 if dong == "방어동" else c_lat
-            base_h_lon = 129.418 if dong == "방어동" else c_lon
+            # 해안가(방어동, 일산동 등)는 바다 침범을 막기 위해 실제 주민센터/주거단지 중심 좌표 사용
+            if dong == "방어동":
+                base_h_lat, base_h_lon = 35.485, 129.418
+            elif dong == "일산동":
+                base_h_lat, base_h_lon = 35.4985, 129.4260  # 일산동 행정복지센터 권역 육지
+            else:
+                base_h_lat, base_h_lon = c_lat, c_lon
 
             # 동 중심 좌표에서 약 200~400m 내외 안전한 육지 분산
             h_lat = round(base_h_lat + random.uniform(-0.003, 0.003), 6)
@@ -253,9 +257,13 @@ def insert_facilities_ulsan_wide(connection, dong_centroids, inserted_dongs):
             for j in range(num_centers):
                 c_title = f"{dong} 제{j+1}경로당"
                 
-                # 방어동 등 해안가 행정동은 꽃바위/행정복지센터 권역 육지 좌표로 고정
-                base_c_lat = 35.485 if dong == "방어동" else c_lat
-                base_c_lon = 129.418 if dong == "방어동" else c_lon
+                # 방어동, 일산동 등 해안가 행정동은 행정복지센터 권역 육지 좌표로 고정
+                if dong == "방어동":
+                    base_c_lat, base_c_lon = 35.485, 129.418
+                elif dong == "일산동":
+                    base_c_lat, base_c_lon = 35.4985, 129.4260  # 일산동 행정복지센터 권역 육지
+                else:
+                    base_c_lat, base_c_lon = c_lat, c_lon
 
                 # 변수를 덮어쓰지 않고 항상 기준 좌표에서 분산 계산 (바다 누적 이동 버그 해결)
                 center_lat = round(base_c_lat + random.uniform(-0.003, 0.003), 6)

@@ -103,7 +103,7 @@ def render_data_quality_section():
             outlier_display = df_outliers[["facility_name", "facility_type", "latitude", "longitude", "road_address"]]
             st.dataframe(outlier_display, use_container_width=True)
     else:
-        st.success("✅ **울산 경계 이탈 이상치 0건**: 모든 정상 좌표 시설이 울산광역시 관할 구역 내에 올바르게 위치하고 있습니다.")
+        st.success("✅ **울산 경계 이탈 이상치 0건**: 모든 정상 좌표 시설이 울산광역시 관할 구역(위도 35.35~35.70, 경도 129.05~129.45) 내에 올바르게 위치하고 있습니다. (해안가 행정동은 바다 침범 방지를 위해 육지 중심 좌표로 보정 적용 완료)")
 
 def render_data_sources_and_limitations():
     """데이터 출처 및 라이선스, 분석상 한계점을 안내합니다."""
