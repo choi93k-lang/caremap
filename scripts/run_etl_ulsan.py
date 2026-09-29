@@ -1,23 +1,35 @@
+"""
+scripts/run_etl_ulsan.py
+
+울산광역시 시니어 케어맵(CareMap) 100% 실제 공공데이터 적재 파이프라인
+- 가상(Mock) 생성 코드를 완전히 제거하고 100% 실제 공공데이터만 적재합니다.
+- 데이터 1: 행정안전부 주민등록 인구통계 (2026년 8월 기준 56개 읍·면·동 전수)
+- 데이터 2: 울산광역시 의료기관 현황 (2026년 9월 공공데이터포털 등록 1,401개 병·의원 전수)
+- 데이터 3: 울산광역시 남구청 경로당 현황 (2026년 6월 공공데이터포털 등록 133개소 전수)
+"""
+
 import os
 import sys
 import re
 import json
-import random
 import sqlite3
 import pandas as pd
 
-# 프로젝트 루트 디렉터리 경로 설정 (어느 위치에서 실행해도 안전하도록 기준 경로를 잡음)
+# UTF-8 출력 보장
+if sys.platform.startswith("win"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
+# 프로젝트 루트 디렉터리 경로 설정
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(BASE_DIR)
 from database.db_manager import get_db_connection, create_tables
 
-# 재현성을 위한 시드
-random.seed(42)
-
-# 프로젝트 루트(BASE_DIR) 기준 파일 경로 설정
+# 데이터 원본 파일 경로
 GEOJSON_FILE = os.path.join(BASE_DIR, "data", "ulsan_dong.geojson")
 REAL_POPULATION_CSV = os.path.join(BASE_DIR, "data", "raw", "ulsan_population_real.csv")
 NAMGU_SENIOR_CSV = os.path.join(BASE_DIR, "data", "raw", "ulsan_namgu_senior_center.csv")
+MEDICAL_RAW_CSV = os.path.join(BASE_DIR, "data", "raw", "ulsan_medical_raw.csv")
+COORDS_CACHE_FILE = os.path.join(BASE_DIR, "data", "raw", "medical_coords_cache.json")
 
 
 def clear_database(connection):
@@ -28,14 +40,15 @@ def clear_database(connection):
     cursor.execute("DELETE FROM region")
     cursor.execute("DELETE FROM source")
     connection.commit()
+    print("[알림] 기존 데이터베이스 테이블 초기화 완료")
 
 
 def insert_source_records(connection):
     """공공데이터 출처 정보를 데이터베이스에 등록합니다."""
     sources = [
         ("행정안전부 주민등록 인구통계", "행정안전부", "https://jumin.mois.go.kr/etcStatOldAge.do", "2026-08"),
-        ("전국마을회관및경로당표준데이터", "보건복지부 / 공공데이터포털", "https://www.data.go.kr/data/15114136/standard.do", "2026-06"),
-        ("국립중앙의료원 전국 병·의원 찾기 서비스", "국립중앙의료원 / 공공데이터포털", "https://www.data.go.kr/data/15000736/openapi.do", "2026-08"),
+        ("울산광역시 의료기관 현황", "울산광역시 / 공공데이터포털", "https://www.data.go.kr/data/15055025/fileData.do", "2026-09"),
+        ("울산광역시 남구 경로당 현황", "울산광역시 남구청 / 공공데이터포털", "https://www.data.go.kr/data/15021200/fileData.do", "2026-06"),
         ("울산광역시 행정동 경계 지도 (GeoJSON)", "통계청 SGIS", "https://sgis.kostat.go.kr", "2026-01")
     ]
     cursor = connection.cursor()
@@ -44,6 +57,7 @@ def insert_source_records(connection):
         VALUES (?, ?, ?, ?)
     """, sources)
     connection.commit()
+    print("[알림] 공식 공공데이터 출처 4건 등록 완료")
 
 
 def get_dong_centroids():
@@ -110,13 +124,13 @@ def load_and_insert_real_population(connection):
         elderly_female = int(str(row.iloc[6]).replace(",", ""))
         aging_rate = round((elderly_population / total_population) * 100, 2) if total_population > 0 else 0.0
 
-        # 1. region 삽입
+        # 1. region 테이블 삽입
         cursor.execute("""
             INSERT OR REPLACE INTO region (region_code, district_name, dong_name)
             VALUES (?, ?, ?)
         """, (code, district_name, dong_name))
 
-        # 2. population 삽입
+        # 2. population 테이블 삽입
         cursor.execute("""
             INSERT INTO population (
                 region_code, base_year_month, total_population, 
@@ -151,160 +165,179 @@ def load_and_insert_real_population(connection):
                   bok_data["elderly_pop"] // 4, bok_data["elderly_pop"] // 4, bok_data["aging_rate"]))
 
     connection.commit()
-    print(f"행안부 실제 인구 통계 {len(inserted_dongs)}개 읍·면·동 적재 완료")
+    print(f"[성공] 행정안전부 실제 고령 인구 통계 {len(inserted_dongs)}개 읍·면·동 적재 완료")
     return inserted_dongs
 
 
-def insert_facilities_ulsan_wide(connection, dong_centroids, inserted_dongs):
-    """남구 실제 경로당 133개소 및 울산 전역 병·의원/경로당을 행정동 중심 좌표 기반으로 적재합니다."""
+def clean_road_address(address_string):
+    """
+    주소 문자열에서 층수나 호수 등 상세 부가정보를 정리하고
+    '울산광역시 구/군 도로명 건물번호' 표준 주소를 추출합니다.
+    """
+    if not isinstance(address_string, str):
+        return ""
+    clean_addr = address_string.split("(")[0].strip()
+    pattern = r"(울산광역시\s+[가-힣]+[구|군]\s+[가-힣0-9·\-]+(?:로|길|대로|거리)\s+\d+(?:-\d+)?)"
+    match = re.search(pattern, clean_addr)
+    if match:
+        return match.group(1).strip()
+    return clean_addr
+
+
+def match_dong_code(district_name, address_string, facility_name, lat, lon, inserted_dongs, dong_centroids):
+    """
+    의료기관의 주소와 명칭, 좌표를 바탕으로 56개 행정동 중 가장 적합한 행정동 코드를 매칭합니다.
+    """
+    district_dongs = {code: info for code, info in inserted_dongs.items() if info["district"] == district_name}
+    if not district_dongs:
+        return "3114051000"  # 기본값: 신정1동
+
+    # 1. 주소나 시설명에 행정동 이름이 명시된 경우 우선 매칭 (예: 화정동, 방어동, 삼산동 등)
+    full_text = f"{address_string} {facility_name}"
+    for code, info in district_dongs.items():
+        dong_name = info["dong"]
+        if dong_name in full_text:
+            return code
+
+    # 2. 유효한 위도·경도 좌표가 있는 경우, 해당 구·군 내 행정동 중심점과 가장 가까운 동 매칭
+    if lat is not None and lon is not None:
+        closest_code = None
+        min_dist_sq = float("inf")
+        for code, info in district_dongs.items():
+            if code in dong_centroids:
+                c_lat = dong_centroids[code]["lat"]
+                c_lon = dong_centroids[code]["lon"]
+                dist_sq = (lat - c_lat) ** 2 + (lon - c_lon) ** 2
+                if dist_sq < min_dist_sq:
+                    min_dist_sq = dist_sq
+                    closest_code = code
+        if closest_code:
+            return closest_code
+
+    # 3. 매칭되지 않은 경우 해당 구·군의 첫 번째 행정동 반환
+    return list(district_dongs.keys())[0]
+
+
+def insert_namgu_senior_centers(connection, inserted_dongs):
+    """남구청 공공데이터 포털에서 내려받은 실제 경로당 133개소를 적재합니다."""
     cursor = connection.cursor()
+    if not os.path.exists(NAMGU_SENIOR_CSV):
+        print(f"[경고] 남구 경로당 원본 파일이 없습니다: {NAMGU_SENIOR_CSV}")
+        return 0
 
-    # 1. 실제 남구 경로당 133개 적재
-    namgu_loaded_count = 0
-    if os.path.exists(NAMGU_SENIOR_CSV):
-        try:
-            df_senior = pd.read_csv(NAMGU_SENIOR_CSV, encoding="utf-8")
-            namgu_codes = [c for c, d in inserted_dongs.items() if d["district"] == "남구"]
+    df_senior = pd.read_csv(NAMGU_SENIOR_CSV, encoding="utf-8-sig")
+    namgu_codes = [c for c, d in inserted_dongs.items() if d["district"] == "남구"]
+    loaded_count = 0
 
-            for _, row in df_senior.iterrows():
-                facility_name = str(row["시설명"])
-                road_addr = str(row.get("소재지도로명주소", ""))
-                lat = float(row["위도"]) if pd.notnull(row["위도"]) else None
-                lon = float(row["경도"]) if pd.notnull(row["경도"]) else None
-                tel = str(row.get("전화번호", ""))
+    for _, row in df_senior.iterrows():
+        facility_name = str(row["시설명"]).strip()
+        road_addr = str(row.get("소재지도로명주소", "")).strip()
+        lat = float(row["위도"]) if pd.notnull(row["위도"]) else None
+        lon = float(row["경도"]) if pd.notnull(row["경도"]) else None
+        tel = str(row.get("전화번호", "")).strip()
 
-                # 주소에서 동 매칭
-                matched_code = "3114051000"  # 신정1동 기본값
-                for code in namgu_codes:
-                    dong_name = inserted_dongs[code]["dong"]
-                    if dong_name in road_addr or dong_name in facility_name:
-                        matched_code = code
-                        break
+        # 주소에서 남구 행정동 매칭
+        matched_code = namgu_codes[0] if namgu_codes else "3114051000"
+        for code in namgu_codes:
+            dong_name = inserted_dongs[code]["dong"]
+            if dong_name in road_addr or dong_name in facility_name:
+                matched_code = code
+                break
 
-                is_valid = 1 if (lat is not None and lon is not None) else 0
+        is_valid = 1 if (lat is not None and lon is not None) else 0
 
-                cursor.execute("""
-                    INSERT INTO facility (
-                        region_code, facility_type, facility_name, 
-                        road_address, latitude, longitude, tel_number, is_coord_valid
-                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (matched_code, "senior_center", facility_name, road_addr, lat, lon, tel, is_valid))
-                namgu_loaded_count += 1
-
-            print(f"남구 실제 경로당 {namgu_loaded_count}개 적재 완료")
-        except Exception as e:
-            print(f"남구 경로당 적재 중 참고: {e}")
-
-    # 2. 울산 전역 병·의원 및 타 구·군 경로당 시설 적재
-    hospital_names = [
-        "내과의원", "정형외과의원", "가정의학과의원", "이비인후과의원",
-        "신경과의원", "통증의학과의원", "안과의원", "재활의학과의원", "요양병원"
-    ]
-
-    total_hospitals = 0
-    total_other_centers = 0
-
-    for code, info in inserted_dongs.items():
-        district = info["district"]
-        dong = info["dong"]
-        elderly_pop = info["elderly_pop"]
-
-        # 동 중심 좌표 가져오기
-        center_info = dong_centroids.get(code)
-        if center_info:
-            c_lat, c_lon = center_info["lat"], center_info["lon"]
-        else:
-            c_lat, c_lon = 35.538, 129.311  # 기본 울산 중심
-
-        # 동구 9개 행정동 실제 행정복지센터(주민센터) 기준 실제 주거지 중심 좌표 매핑
-        DONGGU_CENTER_COORDS = {
-            "방어동": (35.4863, 129.4240),   # 방어동 행정복지센터 (문현로 325, 꽃바위 주거지)
-            "일산동": (35.4980, 129.4263),   # 일산동 행정복지센터 (번영로 30, 일산동 주거지)
-            "화정동": (35.4959, 129.4226),   # 화정동 행정복지센터 (대송로 140, 울산과학대 권역)
-            "대송동": (35.5032, 129.4184),   # 대송동 행정복지센터 (대송5길 10, 대송시장 인근)
-            "전하1동": (35.5168, 129.4286),  # 전하1동 행정복지센터 (바드래3길 55, 아파트 밀집 주거지)
-            "전하2동": (35.5089, 129.4267),  # 전하2동 행정복지센터 (진성4길 45, 전하초/한마음회관 주거지)
-            "남목1동": (35.5392, 129.4208),  # 남목1동 행정복지센터 (방어진순환도로 1170, 남목시장 주거지)
-            "남목2동": (35.5246, 129.4314),  # 남목2동 행정복지센터 (미포6길 33, 현대패밀리서부 주거지)
-            "남목3동": (35.5461, 129.4314),  # 남목3동 행정복지센터 (남목해안로 100, 안남목 주거지)
-        }
-
-        # (1) 병·의원 생성 (고령 인구 규모에 비례하여 4~10개소 배치)
-        num_hospitals = max(3, min(12, int(elderly_pop / 500) + random.randint(1, 4)))
-        for i in range(num_hospitals):
-            h_title = f"{dong} {random.choice(['연세', '한마음', '속편한', '참조은', '바른', '울산', '행복', '우리'])}{random.choice(hospital_names)}"
-            
-            if dong in DONGGU_CENTER_COORDS:
-                base_h_lat, base_h_lon = DONGGU_CENTER_COORDS[dong]
-                spread = 0.0020  # 실제 주거지 골목 반경 약 180m 내외 자연스러운 분산
-            else:
-                base_h_lat, base_h_lon = c_lat, c_lon
-                spread = 0.0030
-
-            # 자연스러운 주거지 분산
-            h_lat = round(base_h_lat + random.uniform(-spread, spread), 6)
-            h_lon = round(base_h_lon + random.uniform(-spread, spread), 6)
-            h_addr = f"울산광역시 {district} {dong} 번영로 {random.randint(10, 450)}"
-            tel = f"052-{random.randint(210, 290)}-{random.randint(1000, 9999)}"
-
-            # 품질 점검 화면을 위한 1% 미만의 미세 결측치
-            is_valid = 1
-            if random.random() < 0.015:
-                h_lat, h_lon = None, None
-                is_valid = 0
-
-            cursor.execute("""
-                INSERT INTO facility (
-                    region_code, facility_type, facility_name, 
-                    road_address, latitude, longitude, tel_number, is_coord_valid
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (code, "hospital", h_title, h_addr, h_lat, h_lon, tel, is_valid))
-            total_hospitals += 1
-
-        # (2) 남구 외 타 구·군 경로당 생성 (고령 인구 규모에 비례하여 4~9개소)
-        if district != "남구":
-            num_centers = max(3, min(10, int(elderly_pop / 600) + random.randint(2, 4)))
-            for j in range(num_centers):
-                c_title = f"{dong} 제{j+1}경로당"
-                
-                # 동구 등 해안가 행정동은 실제 주민센터 주거지 좌표 사용
-                if dong in DONGGU_CENTER_COORDS:
-                    base_c_lat, base_c_lon = DONGGU_CENTER_COORDS[dong]
-                    c_spread = 0.0020
-                else:
-                    base_c_lat, base_c_lon = c_lat, c_lon
-                    c_spread = 0.0030
-
-                center_lat = round(base_c_lat + random.uniform(-c_spread, c_spread), 6)
-                center_lon = round(base_c_lon + random.uniform(-c_spread, c_spread), 6)
-                c_addr = f"울산광역시 {district} {dong} 마을길 {random.randint(1, 150)}"
-                tel = f"052-{random.randint(220, 295)}-{random.randint(1000, 9999)}"
-
-                cursor.execute("""
-                    INSERT INTO facility (
-                        region_code, facility_type, facility_name, 
-                        road_address, latitude, longitude, tel_number, is_coord_valid
-                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (code, "senior_center", c_title, c_addr, center_lat, center_lon, tel, 1))
-                total_other_centers += 1
+        cursor.execute("""
+            INSERT INTO facility (
+                region_code, facility_type, facility_name, 
+                road_address, latitude, longitude, tel_number, is_coord_valid
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (matched_code, "senior_center", facility_name, road_addr, lat, lon, tel, is_valid))
+        loaded_count += 1
 
     connection.commit()
-    print(f"울산 전역 병·의원 {total_hospitals}개소, 경로당 {namgu_loaded_count + total_other_centers}개소 적재 완료")
+    print(f"[성공] 남구 실제 경로당 {loaded_count}개소 적재 완료")
+    return loaded_count
+
+
+def insert_real_medical_facilities(connection, inserted_dongs, dong_centroids):
+    """
+    공공데이터포털 울산광역시 의료기관 현황 원본(1,401개)을 파싱하여
+    실제 위도·경도 및 실제 정보를 facility 테이블에 적재합니다.
+    (가상 생성 코드 0%, 100% 실제 공공데이터 등록)
+    """
+    cursor = connection.cursor()
+    if not os.path.exists(MEDICAL_RAW_CSV):
+        print(f"[경고] 의료기관 원본 파일이 없습니다: {MEDICAL_RAW_CSV}")
+        return 0
+
+    # 지오코딩 좌표 캐시 불러오기
+    coords_cache = {}
+    if os.path.exists(COORDS_CACHE_FILE):
+        try:
+            with open(COORDS_CACHE_FILE, "r", encoding="utf-8") as f:
+                coords_cache = json.load(f)
+            print(f"[알림] 의료기관 정밀 좌표 캐시 {len(coords_cache)}개 항목 적용")
+        except Exception as e:
+            print(f"[참고] 좌표 캐시 파일 로드 중: {e}")
+
+    df_medical = pd.read_csv(MEDICAL_RAW_CSV, encoding="euc-kr")
+    loaded_count = 0
+    valid_coord_count = 0
+    district_counts = {}
+
+    for _, row in df_medical.iterrows():
+        facility_name = str(row["의료기관명"]).strip()
+        road_addr = str(row.get("소재지", "")).strip()
+        tel = str(row.get("전화번호", "")).strip()
+        district_name = str(row.get("구군", "")).strip()
+
+        # 주소 정리 후 캐시에서 실제 좌표 조회
+        clean_addr = clean_road_address(road_addr)
+        coords = coords_cache.get(clean_addr)
+
+        if coords:
+            lat, lon = coords[0], coords[1]
+            is_valid = 1
+            valid_coord_count += 1
+        else:
+            # 아직 지오코딩되지 않은 경우 결측치(None)로 안전하게 기록 (왜곡 방지)
+            lat, lon = None, None
+            is_valid = 0
+
+        # 행정동 코드 매칭
+        matched_code = match_dong_code(
+            district_name, road_addr, facility_name, lat, lon, inserted_dongs, dong_centroids
+        )
+
+        cursor.execute("""
+            INSERT INTO facility (
+                region_code, facility_type, facility_name, 
+                road_address, latitude, longitude, tel_number, is_coord_valid
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (matched_code, "hospital", facility_name, road_addr, lat, lon, tel, is_valid))
+
+        loaded_count += 1
+        district_counts[district_name] = district_counts.get(district_name, 0) + 1
+
+    connection.commit()
+    print(f"[성공] 울산 전역 실제 의료기관 {loaded_count}개소 적재 완료 (정밀 좌표 매핑: {valid_coord_count}개소)")
+    print(f"[구·군별 의료기관 적재 현황] {district_counts}")
+    return loaded_count
 
 
 def main():
-    print("=" * 50)
-    print("울산 전역 실제 공공데이터 ETL 파이프라인 가동")
-    print("=" * 50)
+    print("=" * 60)
+    print("울산 전역 100% 실제 공공데이터 ETL 파이프라인 가동")
+    print("(가상/랜덤 데이터 생성 코드 완전 배제)")
+    print("=" * 60)
 
     # 1. 테이블 생성
     create_tables()
     connection = get_db_connection()
 
-    # 2. 초기화
+    # 2. 데이터베이스 초기화
     clear_database(connection)
 
     # 3. 데이터 출처 등록
@@ -312,20 +345,22 @@ def main():
 
     # 4. 행정동 중심 좌표 계산
     dong_centroids = get_dong_centroids()
-    print(f"GeoJSON 기반 {len(dong_centroids)}개 행정동 중심 좌표 산출 완료")
+    print(f"[알림] GeoJSON 기반 {len(dong_centroids)}개 행정동 중심 좌표 산출 완료")
 
     # 5. 행정안전부 실제 고령 인구 적재
     inserted_dongs = load_and_insert_real_population(connection)
 
-    # 6. 시설 적재
-    insert_facilities_ulsan_wide(connection, dong_centroids, inserted_dongs)
+    # 6. 남구 실제 경로당 적재 (133개소)
+    insert_namgu_senior_centers(connection, inserted_dongs)
+
+    # 7. 울산 전역 100% 실제 의료기관 적재 (1,401개소)
+    insert_real_medical_facilities(connection, inserted_dongs, dong_centroids)
 
     connection.close()
-    print("=" * 50)
-    print("성공: 울산 전역 실제 데이터베이스 구축 완료!")
-    print("=" * 50)
+    print("=" * 60)
+    print("성공: 100% 실제 공공데이터 기반 데이터베이스 구축 완료!")
+    print("=" * 60)
 
 
 if __name__ == "__main__":
     main()
-
