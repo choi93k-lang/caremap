@@ -39,18 +39,19 @@ uv run streamlit run app.py
 ## 🗂️ 3. 디렉터리 구조
 
 ```text
-2팀프로젝트/
+caremap/
 ├── data/
 │   ├── raw/                           # 원본 공공데이터 CSV 파일
-│   │   ├── ulsan_namgu_population.csv
-│   │   ├── ulsan_district_age_population.csv
-│   │   └── ulsan_namgu_senior_center.csv
+│   │   ├── ulsan_population_real.csv
+│   │   ├── ulsan_medical_official.csv
+│   │   └── ulsan_senior_official.csv
 │   └── ulsan_dong.geojson             # 울산 행정동 경계 지도 (WGS84)
 ├── database/
 │   ├── caremap.db                     # 정제 및 적재 완료된 SQLite DB
 │   └── db_manager.py                  # DB 연결 및 데이터 조회 헬퍼 모듈
 ├── scripts/
-│   └── create_mock_data.py            # 데이터 생성 및 DB 적재 스크립트
+│   ├── extract_ulsan_data.py          # 공공데이터 추출 스크립트
+│   └── run_etl_ulsan.py               # 100% 공식 데이터 적재 ETL 스크립트
 ├── pages/
 │   ├── 1_종합현황.py                   # [Page 1] KPI 카드, 구·군별 인구/시설 차트
 │   ├── 2_시니어지도.py                # [Page 2] Folium 고령화율 지도 및 시설 마커
