@@ -201,9 +201,9 @@ def add_facility_markers(care_map, df_fac, show_hospitals, show_centers):
     # 유효한 좌표만 필터링
     valid_fac = df_fac[df_fac["is_coord_valid"] == 1].dropna(subset=["latitude", "longitude"])
 
-    # 1. 병·의원 레이어
+    # 1. 병·의원 레이어 (마커 클러스터 적용으로 초고속 로딩)
     if show_hospitals:
-        hospital_group = folium.FeatureGroup(name="🏥 병·의원 레이어")
+        hospital_cluster = MarkerCluster(name="🏥 병·의원 레이어 (클러스터)")
         hospitals = valid_fac[valid_fac["facility_type"] == "hospital"]
         for _, row in hospitals.iterrows():
             tel = row['tel_number'] if row['tel_number'] else '정보없음'
@@ -217,8 +217,8 @@ def add_facility_markers(care_map, df_fac, show_hospitals, show_centers):
                 fill_opacity=0.85,
                 tooltip=f"🏥 {row['facility_name']}",
                 popup=folium.Popup(popup_text, max_width=240)
-            ).add_to(hospital_group)
-        hospital_group.add_to(care_map)
+            ).add_to(hospital_cluster)
+        hospital_cluster.add_to(care_map)
 
     # 2. 경로당 레이어 (마커 클러스터 적용)
     if show_centers:
