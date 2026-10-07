@@ -34,6 +34,11 @@ def render_kpi_cards(df_pop, df_fac, selected_district):
     col4.metric("병·의원 수", f"{hospital_count:,}개소")
     col5.metric("경로당 수", f"{senior_center_count:,}개소")
 
+    if selected_district == "울주군":
+        st.info("💡 **울주군 경로당 데이터 안내**: 울주군 관내에는 약 416개소의 경로당이 실제 운영 중이나, 지자체의 행정안전부 전국 표준데이터 미제출로 인해 현재 공공데이터상 수치가 0개소로 집계됩니다. (병·의원은 210개소 정상 집계)")
+    elif selected_district == "전체":
+        st.caption("※ 울산 전체 경로당 수(439개소)는 지자체 공공데이터 미제출로 인해 울주군 수치가 제외된 4개 구(남·중·동·북구)의 합계입니다.")
+
 def render_district_bar_chart(df_comp):
     """구·군별 고령인구와 고령화율을 비교하는 막대 차트를 렌더링합니다."""
     district_summary = df_comp.groupby("district_name").agg({
@@ -138,6 +143,7 @@ def render_district_summary_table(df_comp):
         }),
         use_container_width=True
     )
+    st.caption("※ **울주군 경로당 데이터 안내**: 울주군 관내에는 약 416개소의 경로당이 운영 중이나, 행정안전부 전국 표준데이터 미제출로 인해 표상에는 0개소(1천명당 0.00개)로 집계되어 있습니다.")
 
 def main():
     st.title("📊 울산 고령화 및 인프라 종합 현황")

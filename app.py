@@ -47,6 +47,8 @@ def show_home_page():
     col4.metric("병·의원 수", f"{hospital_count:,}개소")
     col5.metric("경로당 수", f"{senior_center_count:,}개소")
 
+    st.caption("※ 전체 경로당 수(439개소)는 행정안전부 표준데이터 기준이며, 지자체 미제출로 울주군(실제 약 416개소 운영 중)은 집계에서 제외되어 있습니다.")
+
     st.markdown("---")
     st.markdown("### 📌 대시보드 메뉴 안내")
 
