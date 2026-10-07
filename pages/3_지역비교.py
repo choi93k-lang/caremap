@@ -17,6 +17,9 @@ def render_scatter_section(df_comp):
             index=0
         )
 
+    if metric_choice in ["경로당 (1천명당)", "전체 시설 (1천명당)"]:
+        st.caption("💡 *참고: 울주군은 지자체의 행정안전부 경로당 표준데이터 미제출로 인해 산점도 상에서 경로당 지표가 0개소로 집계되어 최하단에 위치합니다.*")
+
     # 선택에 따른 컬럼 매핑
     if metric_choice == "병·의원 (1천명당)":
         y_col = "hospitals_per_1k"
@@ -125,6 +128,11 @@ def render_dong_comparison_section(df_comp):
         sub4, sub5 = st.columns(2)
         sub4.metric("병·의원 수 (1천명당)", f"{int(data_b['hospital_count'])}개 ({data_b['hospitals_per_1k']:.2f}개)")
         sub5.metric("경로당 수 (1천명당)", f"{int(data_b['senior_center_count'])}개 ({data_b['centers_per_1k']:.2f}개)")
+
+    # 비교 대상 지역 중 울주군이 포함되어 있는지 확인
+    is_ulju_selected = ("울주군" in dong_a) or ("울주군" in dong_b)
+    if is_ulju_selected:
+        st.info("💡 **울주군 경로당 데이터 안내**: 울주군 관내에는 약 416개소의 경로당이 실제 운영 중이나, 지자체의 행정안전부 전국 표준데이터 미제출로 인해 현재 공공데이터상 수치가 0개소로 집계됩니다. (병·의원 수치는 정상 집계)")
 
     # 막대 비교 차트
     categories = ["고령화율 (%)", "1천명당 병원수", "1천명당 경로당수"]
