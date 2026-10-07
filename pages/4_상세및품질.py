@@ -43,6 +43,10 @@ def render_dong_profile(selected_district):
     col3.metric("고령화율", f"{dong_pop['aging_rate']:.2f}%")
     col4.metric("등록 시설 수", f"{len(df_facility):,}개소")
 
+    # 울주군 선택 시 경로당 공공데이터 미제공 안내
+    if selected_district == "울주군":
+        st.info("💡 **울주군 경로당 데이터 안내**: 울주군 관내에는 약 416개소의 경로당이 실제 운영 중이나, 지자체의 행정안전부 전국 표준데이터 미제출로 인해 현재 공공데이터 목록이 제공되지 않습니다. 아래 목록에는 병·의원 시설만 표시됩니다.")
+
     st.markdown("##### 📍 시설 목록")
     st.dataframe(df_facility, use_container_width=True)
 
