@@ -52,32 +52,38 @@ def show_home_page():
 
     col1, col2 = st.columns(2)
     with col1:
-        st.info("""
-        [**1. 📊 종합 현황 (Overview) ➔**](/종합현황)
-        - 구·군별 고령인구 현황 및 고령화율 비교
-        - 고령화율 상위 10개 행정동 순위 확인
-        - 구·군 단위 인프라 요약 통계
-        """)
-        st.success("""
-        [**2. 🗺️ 시니어 케어 지도 (Map) ➔**](/시니어지도)
-        - 행정동별 고령화율 단계구분도(Choropleth)
-        - 병·의원 및 경로당 위치 마커 레이어 토글
-        - 시설 밀집도 확인을 위한 마커 클러스터링
-        """)
+        with st.container(border=True):
+            st.page_link("pages/1_종합현황.py", label="**1. 📊 종합 현황 (Overview) ➔**")
+            st.markdown("""
+            - 구·군별 고령인구 현황 및 고령화율 비교
+            - 고령화율 상위 10개 행정동 순위 확인
+            - 구·군 단위 인프라 요약 통계
+            """)
+
+        with st.container(border=True):
+            st.page_link("pages/2_시니어지도.py", label="**2. 🗺️ 시니어 케어 지도 (Map) ➔**")
+            st.markdown("""
+            - 행정동별 고령화율 단계구분도(Choropleth)
+            - 병·의원 및 경로당 위치 마커 레이어 토글
+            - 시설 밀집도 확인을 위한 마커 클러스터링
+            """)
 
     with col2:
-        st.warning("""
-        [**3. ⚖️ 지역 비교 및 사분면 분석 (Comparison) ➔**](/지역비교)
-        - 고령화율 vs 1천명당 시설 수 4분면 산점도
-        - 상대적 인프라 관심 지역 탐색
-        - 두 개 행정동 1:1 맞비교 분석
-        """)
-        st.info("""
-        [**4. 📋 상세 정보 & 데이터 품질 (Detail & Quality) ➔**](/상세및품질)
-        - 행정동별 시설 상세 목록 및 CSV 다운로드
-        - 좌표 결측치 등 데이터 품질 지표 점검
-        - 공공데이터 원천 출처 및 분석 한계 안내
-        """)
+        with st.container(border=True):
+            st.page_link("pages/3_지역비교.py", label="**3. ⚖️ 지역 비교 및 사분면 분석 (Comparison) ➔**")
+            st.markdown("""
+            - 고령화율 vs 1천명당 시설 수 4분면 산점도
+            - 상대적 인프라 관심 지역 탐색
+            - 두 개 행정동 1:1 맞비교 분석
+            """)
+
+        with st.container(border=True):
+            st.page_link("pages/4_상세및품질.py", label="**4. 📋 상세 정보 & 데이터 품질 (Detail & Quality) ➔**")
+            st.markdown("""
+            - 행정동별 시설 상세 목록 및 CSV 다운로드
+            - 좌표 결측치 등 데이터 품질 지표 점검
+            - 공공데이터 원천 출처 및 분석 한계 안내
+            """)
 
     st.markdown("---")
     st.caption("데이터 기준: 2026년 8월 | 공공데이터포털, 건강보험심사평가원, 행정안전부, 통계청 SGIS 기반 | 울산 시니어케어맵")
