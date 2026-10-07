@@ -268,23 +268,25 @@ def main():
     st.sidebar.markdown("---")
     st.sidebar.subheader("시설 표시 토글")
     
-    # '전체'일 때는 번개처럼 빠른 로딩을 위해 마커 기본값을 OFF로 설정하고, 특정 구를 선택하면 자동으로 ON으로 설정합니다.
-    default_marker_visible = (selected_district != "전체")
+    # '전체'일 때는 번개처럼 빠른 로딩을 위해 마커 체크박스를 비활성화하고, 특정 구를 선택하면 활성화합니다.
+    is_all_district = (selected_district == "전체")
 
     show_hospitals = st.sidebar.checkbox(
         "🏥 병·의원 마커 표시 (파랑)", 
-        value=default_marker_visible, 
+        value=False if is_all_district else True, 
+        disabled=is_all_district,
         key=f"hosp_{selected_district}"
     )
     show_centers = st.sidebar.checkbox(
         "👵 경로당 마커 표시 (보라)", 
-        value=default_marker_visible, 
+        value=False if is_all_district else True, 
+        disabled=is_all_district,
         key=f"center_{selected_district}"
     )
     show_choropleth = st.sidebar.checkbox("🎨 행정동 고령화율 단계구분도 표시", value=True)
 
-    if selected_district == "전체" and not (show_hospitals or show_centers):
-        st.sidebar.caption("⚡ 전체 화면에서는 초고속 로딩을 위해 마커가 기본 해제되어 있습니다. 시설을 보시려면 위 체크박스를 켜주세요.")
+    if is_all_district:
+        st.sidebar.caption("💡 특정 구·군을 선택하시면 시설 마커가 활성화됩니다.")
 
     # 최신 데이터 실시간 로드 (캐시 지연 방지)
     df_pop, df_fac = get_map_data(selected_district)
@@ -321,9 +323,16 @@ def main():
         if show_hospitals or show_centers:
             st.success(f"📌 지도 표시 시설: **{displayed_count:,}개소**")
         else:
-            st.info("📌 지도 표시 시설: **0개소 (마커 꺼짐)**")
+            if is_all_district:
+                st.info("📌 지도 표시 시설: **0개소 (전체 조망 모드)**")
+            else:
+                st.info("📌 지도 표시 시설: **0개소 (마커 꺼짐)**")
     with col3:
         st.warning("💡 범례: 30%+ (진한빨강) / 20~25% (노랑) / 16%미만 (초록)")
+
+    # 전체 화면일 때 안내 문구
+    if is_all_district:
+        st.info("🗺️ **울산 전체 고령화율 조망 모드**: 시 전체 화면에서는 쾌적한 조회를 위해 행정동별 고령화율 단계구분도만 제공됩니다. 상세 시설(병원·경로당) 위치는 왼쪽 사이드바에서 **특정 구·군(남구, 동구 등)**을 선택하시면 바로 활성화됩니다.")
 
     # 울주군 선택 시 경로당 공공데이터 미제공 안내
     if selected_district == "울주군":
