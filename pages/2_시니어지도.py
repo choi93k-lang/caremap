@@ -325,6 +325,10 @@ def main():
     with col3:
         st.warning("💡 범례: 30%+ (진한빨강) / 20~25% (노랑) / 16%미만 (초록)")
 
+    # 울주군 선택 시 경로당 공공데이터 미제공 안내
+    if selected_district == "울주군":
+        st.info("💡 **울주군 경로당 데이터 안내**: 울주군 관내에는 약 416개소의 경로당이 실제 운영 중이나, 지자체의 행정안전부 전국 표준데이터 미제출로 인해 현재 지도상 표시가 제한됩니다. (병·의원 210개소는 정상 제공)")
+
     # Streamlit에 Folium 지도 렌더링 (returned_objects=[] 로 단방향 경량 모드 활성화)
     st_folium(care_map, width="100%", height=600, returned_objects=[])
 
