@@ -50,9 +50,42 @@ def show_home_page():
     st.markdown("---")
     st.markdown("### 📌 대시보드 메뉴 안내")
 
+    # 기존의 고유 카드 배경 색상 복원 (파랑, 초록, 노랑, 파랑)
+    st.markdown("""
+    <style>
+    /* 카드 1: 종합 현황 (연한 파랑) */
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-card_overview),
+    div[class*="st-key-card_overview"] {
+        background-color: #EBF3FB !important;
+        border: 1px solid #B9D5F3 !important;
+    }
+
+    /* 카드 2: 시니어 지도 (연한 초록) */
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-card_map),
+    div[class*="st-key-card_map"] {
+        background-color: #E8F5E9 !important;
+        border: 1px solid #C8E6C9 !important;
+    }
+
+    /* 카드 3: 지역 비교 (연한 노랑) */
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-card_compare),
+    div[class*="st-key-card_compare"] {
+        background-color: #FFF9C4 !important;
+        border: 1px solid #FFF176 !important;
+    }
+
+    /* 카드 4: 상세 및 품질 (연한 파랑) */
+    div[data-testid="stVerticalBlockBorderWrapper"]:has(.st-key-card_quality),
+    div[class*="st-key-card_quality"] {
+        background-color: #EBF3FB !important;
+        border: 1px solid #B9D5F3 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     col1, col2 = st.columns(2)
     with col1:
-        with st.container(border=True):
+        with st.container(key="card_overview", border=True):
             st.page_link("pages/1_종합현황.py", label="**1. 📊 종합 현황 (Overview) ➔**")
             st.markdown("""
             - 구·군별 고령인구 현황 및 고령화율 비교
@@ -60,7 +93,7 @@ def show_home_page():
             - 구·군 단위 인프라 요약 통계
             """)
 
-        with st.container(border=True):
+        with st.container(key="card_map", border=True):
             st.page_link("pages/2_시니어지도.py", label="**2. 🗺️ 시니어 케어 지도 (Map) ➔**")
             st.markdown("""
             - 행정동별 고령화율 단계구분도(Choropleth)
@@ -69,7 +102,7 @@ def show_home_page():
             """)
 
     with col2:
-        with st.container(border=True):
+        with st.container(key="card_compare", border=True):
             st.page_link("pages/3_지역비교.py", label="**3. ⚖️ 지역 비교 및 사분면 분석 (Comparison) ➔**")
             st.markdown("""
             - 고령화율 vs 1천명당 시설 수 4분면 산점도
@@ -77,7 +110,7 @@ def show_home_page():
             - 두 개 행정동 1:1 맞비교 분석
             """)
 
-        with st.container(border=True):
+        with st.container(key="card_quality", border=True):
             st.page_link("pages/4_상세및품질.py", label="**4. 📋 상세 정보 & 데이터 품질 (Detail & Quality) ➔**")
             st.markdown("""
             - 행정동별 시설 상세 목록 및 CSV 다운로드
