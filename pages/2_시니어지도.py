@@ -50,26 +50,12 @@ def get_color_by_rate(rate):
 
 
 def create_base_map(center_lat, center_lon, zoom_level):
-    """기본 타일 지도를 생성하고 마커 클러스터에 보라색 테마 스타일을 주입합니다."""
+    """기본 타일 지도를 생성합니다."""
     care_map = folium.Map(
         location=[center_lat, center_lon],
         zoom_start=zoom_level,
         tiles="OpenStreetMap"
     )
-    # 마커 클러스터 숫자 뱃지가 기본 초록색이 아닌 선명한 보라색으로 표시되도록 CSS 주입
-    custom_cluster_css = """
-    <style>
-    .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large {
-        background-color: rgba(156, 39, 176, 0.4) !important;
-    }
-    .marker-cluster-small div, .marker-cluster-medium div, .marker-cluster-large div {
-        background-color: rgba(123, 31, 162, 0.85) !important;
-        color: white !important;
-        font-weight: bold !important;
-    }
-    </style>
-    """
-    care_map.get_root().html.add_child(folium.Element(custom_cluster_css))
     return care_map
 
 
@@ -201,9 +187,36 @@ def add_facility_markers(care_map, df_fac, show_hospitals, show_centers):
     # 유효한 좌표만 필터링
     valid_fac = df_fac[df_fac["is_coord_valid"] == 1].dropna(subset=["latitude", "longitude"])
 
-    # 1. 병·의원 레이어 (마커 클러스터 적용으로 초고속 로딩)
+    # 1. 병·의원 전용 선명한 파란색(Blue) 클러스터 뱃지
+    hospital_cluster_js = """
+    function(cluster) {
+        var count = cluster.getChildCount();
+        return new L.DivIcon({
+            html: '<div style="background-color: rgba(30, 136, 229, 0.88); color: white; border-radius: 50%; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; border: 3px solid rgba(187, 222, 251, 0.85); box-shadow: 0 2px 6px rgba(0,0,0,0.35);"><span>' + count + '</span></div>',
+            className: 'marker-cluster-hospital',
+            iconSize: new L.Point(38, 38)
+        });
+    }
+    """
+
+    # 2. 경로당 전용 선명한 보라색(Purple) 클러스터 뱃지
+    senior_cluster_js = """
+    function(cluster) {
+        var count = cluster.getChildCount();
+        return new L.DivIcon({
+            html: '<div style="background-color: rgba(142, 36, 170, 0.88); color: white; border-radius: 50%; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; border: 3px solid rgba(225, 190, 231, 0.85); box-shadow: 0 2px 6px rgba(0,0,0,0.35);"><span>' + count + '</span></div>',
+            className: 'marker-cluster-senior',
+            iconSize: new L.Point(38, 38)
+        });
+    }
+    """
+
+    # 1. 병·의원 레이어 (파란색 마커 클러스터 적용)
     if show_hospitals:
-        hospital_cluster = MarkerCluster(name="🏥 병·의원 레이어 (클러스터)")
+        hospital_cluster = MarkerCluster(
+            name="🏥 병·의원 레이어 (클러스터)",
+            icon_create_function=hospital_cluster_js
+        )
         hospitals = valid_fac[valid_fac["facility_type"] == "hospital"]
         for _, row in hospitals.iterrows():
             tel = row['tel_number'] if row['tel_number'] else '정보없음'
@@ -220,9 +233,12 @@ def add_facility_markers(care_map, df_fac, show_hospitals, show_centers):
             ).add_to(hospital_cluster)
         hospital_cluster.add_to(care_map)
 
-    # 2. 경로당 레이어 (마커 클러스터 적용)
+    # 2. 경로당 레이어 (보라색 마커 클러스터 적용)
     if show_centers:
-        center_cluster = MarkerCluster(name="👵 경로당 레이어 (클러스터)")
+        center_cluster = MarkerCluster(
+            name="👵 경로당 레이어 (클러스터)",
+            icon_create_function=senior_cluster_js
+        )
         centers = valid_fac[valid_fac["facility_type"] == "senior_center"]
         for _, row in centers.iterrows():
             tel = row['tel_number'] if row['tel_number'] else '정보없음'

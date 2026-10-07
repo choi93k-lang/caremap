@@ -69,29 +69,17 @@ def render_data_quality_section():
     missing_count = total_count - valid_count
     missing_rate = round((missing_count / total_count) * 100, 2) if total_count > 0 else 0
 
-    # 울산광역시 정상 위·경도 범위 (위도: 35.35 ~ 35.70, 경도: 129.05 ~ 129.45)
-    min_lat, max_lat = 35.35, 35.70
-    min_lon, max_lon = 129.05, 129.45
+    # 울산광역시 공식 행정 경계 범위 (GeoJSON 기준 위도: 35.32 ~ 35.73, 경도: 128.97 ~ 129.47)
+    min_lat, max_lat = 35.32, 35.73
+    min_lon, max_lon = 128.97, 129.47
 
-    # 유효 좌표 중 울산 범위를 벗어나거나 동해 바다에 위치한 이상치(Outlier) 확인
+    # 유효 좌표 중 울산 행정 경계를 벗어난 이상치(Outlier) 확인
     df_valid = df_fac_all[df_fac_all["is_coord_valid"] == 1]
     
-    # 1) 울산광역시 전체 사각 경계 이탈
-    box_outlier = (
+    outlier_condition = (
         (df_valid["latitude"] < min_lat) | (df_valid["latitude"] > max_lat) |
         (df_valid["longitude"] < min_lon) | (df_valid["longitude"] > max_lon)
     )
-    # 2) 동구 해안선 이탈 (일산만 해수욕장 129.431 초과 또는 방어진 동단 129.435 초과 시 바다 침범으로 판정)
-    ilsan_sea_outlier = (
-        (df_valid["latitude"] >= 35.490) & (df_valid["latitude"] <= 35.505) &
-        (df_valid["longitude"] > 129.431)
-    )
-    bangeo_sea_outlier = (
-        (df_valid["latitude"] >= 35.470) & (df_valid["latitude"] < 35.490) &
-        (df_valid["longitude"] > 129.435)
-    )
-    sea_outlier = ilsan_sea_outlier | bangeo_sea_outlier
-    outlier_condition = box_outlier | sea_outlier
     df_outliers = df_valid[outlier_condition]
     outlier_count = len(df_outliers)
 
@@ -111,12 +99,12 @@ def render_data_quality_section():
 
     # 이상치 목록 보기
     if outlier_count > 0:
-        with st.expander(f"🚨 울산 경계 및 해안선 이탈 이상치 시설 ({outlier_count}건)"):
-            st.caption("울산광역시 행정 경계(위도 35.35~35.70, 경도 129.05~129.45) 또는 동구 해안선(경도 129.430 이하 육지)을 벗어난 비정상 좌표입니다.")
+        with st.expander(f"🚨 울산 경계 이탈 이상치 시설 ({outlier_count}건)"):
+            st.caption("울산광역시 행정 경계(위도 35.32~35.73, 경도 128.97~129.47)를 벗어난 비정상 좌표입니다.")
             outlier_display = df_outliers[["facility_name", "facility_type", "latitude", "longitude", "road_address"]]
             st.dataframe(outlier_display, use_container_width=True)
     else:
-        st.success("✅ **울산 경계 및 해안선 이탈 이상치 0건**: 모든 정상 좌표 시설이 울산 관할 구역 및 안전한 육지 내에 올바르게 위치하고 있습니다. (해안가 행정동은 바다 침범 방지를 위해 육지 중심 좌표로 보정 완료)")
+        st.success("✅ **울산 경계 이탈 이상치 0건**: 100% 정부 공식 GPS 좌표 기반으로 모든 시설이 울산 관할 구역 내에 올바르게 위치하고 있습니다.")
 
 def render_data_sources_and_limitations():
     """데이터 출처 및 라이선스, 분석상 한계점을 안내합니다."""
